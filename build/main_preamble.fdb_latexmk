@@ -1,0 +1,11 @@
+# Fdb version 4
+["latex"] 1763022547.97216 "main_preamble.tex" "build/main_preamble.dvi" "main_preamble" 1763022565.14757 2
+  "/opt/homebrew/Cellar/texlive/20250308_1/share/texmf-dist/web2c/texmf.cnf" 1741388039 42151 79f67285bdd95beca4d137b380b4b9e5 ""
+  "/opt/homebrew/Cellar/texlive/20250308_1/share/texmf-var/web2c/pdftex/latex.fmt" 1741388039 3345945 4cf614ba1f8f1ea7c5f54db5218171eb ""
+  "build/main_preamble.aux" 1762962757.84786 32 3985256e7290058c681f74d7a3565a19 "latex"
+  "main_preamble.tex" 1762965956.8993 10307 ec012af1cb309595fcde019bf0570431 ""
+  (generated)
+  "build/main_preamble.aux"
+  "build/main_preamble.dvi"
+  "build/main_preamble.log"
+  (rewritten before read)

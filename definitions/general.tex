@@ -1,0 +1,42 @@
+% Custom todo command, switch definitions if you want to quickly 
+% \newcommand{\todo}[1]{{\color{red}\textbf{(#1)}}}
+\newcommand{\todo}[1]{}
+
+
+% Abbrieviations, taken from https://stackoverflow.com/questions/3282319/correct-way-to-define-macros-etc-ie-in-latex
+% These definitions are used in CVPR's style package
+\usepackage{xspace}
+
+% Add a period to the end of an abbreviation unless there's one
+% already, then \xspace.
+\makeatletter
+\DeclareRobustCommand\onedot{\futurelet\@let@token\@onedot}
+\def\@onedot{\ifx\@let@token.\else.\null\fi\xspace}
+
+\def\eg{{e.g}\onedot} 
+\def\Eg{{E.g}\onedot}
+\def\ie{{i.e}\onedot} 
+\def\Ie{{I.e}\onedot}
+\def\cf{{c.f}\onedot} 
+\def\Cf{{C.f}\onedot}
+\def\etc{{etc}\onedot} 
+\def\vs{{vs}\onedot}
+\def\wrt{{w.r.t}\onedot} 
+\def\dof{{d.o.f}\onedot}
+\def\etal{{et al}\onedot}
+\makeatother
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%% Definitions and lengths %%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% Font size (gets local font size)
+\makeatletter
+\newcommand*\myfontsize{\dimexpr\f@size pt\relax}
+\makeatother
+
+% British spellcheck software tends to complain about this
+\newcommand{\centring}{\centering}
+\newenvironment{itemise}{\begin{itemize}}{\end{itemize}}%

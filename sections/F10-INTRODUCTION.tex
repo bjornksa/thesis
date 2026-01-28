@@ -1,0 +1,13 @@
+\documentclass[main.tex]{subfiles}
+
+
+\begin{document}
+
+\glsresetall  % All acronyms get reset
+
+\chapter{Introduction}
+\ifSubfilesClassLoaded{%
+  \bibliographystyle{\chosenbibstyle}
+  \bibliography{bibliography_abbreviated_bibtex}
+}{}
+\end{document}

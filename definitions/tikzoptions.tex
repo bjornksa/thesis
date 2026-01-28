@@ -1,0 +1,13 @@
+% Default options for all tikz figures
+
+\tikzset{
+neuron/.style={circle, draw=black, thin,minimum width=6pt, inner sep=0pt},
+io/.style={neuron, draw=none, fill=none,},
+gap/.style={io},
+relu/.style={neuron, draw=none, fill=none,minimum width=8pt},
+marker/.style={circle, draw=none, thin, fill=white, minimum width=3pt, inner sep=0pt,xshift=3pt,yshift=-2pt},
+conn/.style={-{Stealth[width=3pt,length=4pt]},shorten >=1pt},
+boldconn/.style={conn, black, thin},
+fadeconn/.style={conn, black!30},
+block/.style={rectangle, draw=none, minimum width=2.5cm,minimum height=1cm},
+}

@@ -1,0 +1,18 @@
+\documentclass[main.tex]{subfiles}
+
+\begin{document}
+
+I suppose it's possible to include several files (one for each section) in this file, personally I'll just write everything for a given chapter directly in this file to avoid a very deeply nested file structure.
+
+Nice thing is that~\cite{khalilNonlinearSystems2002},~\cite{kelasidiModelingUnderwaterSnake2014},~\cite{liljebackControllabilityStabilityAnalysis2010} works (due to the little command at the end of the file, keep it when making new chapter files) both when compiling this file separately and when compiling the \texttt{main.tex} file.
+
+By the way, quick intro to the acronym tool if anyone wants to write a 150 page document and not keep track of the first time one uses every single acronym:
+
+If I, say write \gls{ugas} the first time, it presents a certain way. If I write \gls{ugas} again, it presents differently. If you have certain terms that are widely used in both noun and adjective form, I added a neat little thing that lets you write that a system is \glsadj{uges} while another system has the property of \gls{les}, to avoid phrases like ``hence, the system is \gls{gas}'' without having to manually change the acronym definitions dependent on whether first use is as a noun or as an adjective. It's also already build-in to allow for plural longforms and shortforms, such as \glspl{vhc} as an example. As is evident, it's already setup, and you can add your own favorite acronyms in the \texttt{glossary.tex} file.
+
+\ifSubfilesClassLoaded{%
+  \bibliographystyle{\chosenbibstyle}
+  \bibliography{\bibfilename}
+}{}
+
+\end{document}

@@ -1,0 +1,316 @@
+
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+
+\usepackage{etoolbox}
+\usepackage[en-US]{datetime2}
+
+\usepackage{amsmath} %equations and spacings
+\usepackage{amssymb}
+\usepackage{mathcommand} % added by M.E.
+\usepackage{amsfonts} %mathbb
+\usepackage{amsthm} % theorems and proofs
+\usepackage{multicol}
+\usepackage{appendix}
+% \usepackage{easyReview}
+% \usepackage{tgpagella}
+% \usepackage{tgpagella,eulervm}
+% \usepackage{newpxtext,newpxmath}
+% \usepackage{newpxtext,eulervm}
+% Custom commands
+\input{definitions/general.tex}
+\input{definitions/colors.tex}
+\input{definitions/gfx-cmds.tex}
+
+\makeatletter
+\renewenvironment{proof}[1][\relax]{\par
+  \pushQED{\qed}%
+  \normalfont \topsep6\p@\@plus6\p@\relax
+  \trivlist
+  \item[\hskip\labelsep\bfseries
+    \ifx#1\relax \proofname\else#1\fi\@addpunct{.}]\ignorespaces
+}{%
+  \popQED\endtrivlist\@endpefalse
+}
+\makeatother
+
+\DTMlangsetup{showdayofmonth=false}
+
+\renewcommand{\qedsymbol}{$\blacksquare$}
+% \usepackage{utils/texnax}
+%% Nicely format and linebreak URLs in the bibliography (and elsewhere).
+\usepackage{url}
+%% Define a new 'leo' style for the package that will use a smaller font.
+\makeatletter
+\def\url@leostyle{%
+  \@ifundefined{selectfont}{\def\UrlFont{\sf}}{\def\UrlFont{\small\ttfamily}}}
+\makeatother
+%% Now actually use the newly defined style.
+\urlstyle{leo}
+
+
+\usepackage{nicefrac} % nice inline fractions
+\usepackage{bm}
+\usepackage[version=4]{mhchem} % Chemistry
+\usepackage{siunitx}
+\usepackage{pifont} % used for \ding
+\usepackage{lipsum} % acces to random text
+% \usepackage{blindtext} % acces to random text
+
+\usepackage{epigraph,varwidth}
+\renewcommand{\epigraphsize}{\small}
+\setlength{\epigraphwidth}{0.9\textwidth}
+\renewcommand{\textflush}{center}
+\renewcommand{\sourceflush}{center}
+\renewcommand{\epigraphflush}{center}
+% A useful addition
+\newcommand{\epitextfont}{\itshape}
+\newcommand{\episourcefont}{\scshape}
+
+\makeatletter
+\newsavebox{\epi@textbox}
+\newsavebox{\epi@sourcebox}
+\newlength\epi@finalwidth
+\renewcommand{\epigraph}[2]{%
+  \vspace{\beforeepigraphskip}
+  {\epigraphsize\begin{\epigraphflush}
+   \epi@finalwidth=\z@
+   \sbox\epi@textbox{%
+     \varwidth{\epigraphwidth}
+     \begin{\textflush}\epitextfont#1\end{\textflush}
+     \endvarwidth
+   }%
+   \epi@finalwidth=\wd\epi@textbox
+   \sbox\epi@sourcebox{%
+     \varwidth{\epigraphwidth}
+     \begin{\sourceflush}\episourcefont#2\end{\sourceflush}%
+     \endvarwidth
+   }%
+   \ifdim\wd\epi@sourcebox>\epi@finalwidth 
+     \epi@finalwidth=\wd\epi@sourcebox
+   \fi
+   \leavevmode\vbox{
+     \hb@xt@\epi@finalwidth{\hfil\box\epi@textbox}
+     \vskip1.75ex
+     \hrule height \epigraphrule
+     \vskip.75ex
+     \hb@xt@\epi@finalwidth{\hfil\box\epi@sourcebox}
+   }%
+   \end{\epigraphflush}
+   \vspace{\afterepigraphskip}}}
+\makeatother
+
+%graphics
+\usepackage{graphicx}
+\usepackage{svg}
+% \graphicspath{.}
+%\usepackage[demo]{graphicx}
+
+% These settings control how floats (figures) can occupy the page
+% Taken from here: https://robjhyndman.com/hyndsight/latex-floats/
+\setcounter{topnumber}{2} % max number of figs at top
+\setcounter{bottomnumber}{2} % % max number of figs at bottom
+\setcounter{totalnumber}{4} % max number of figs on 1 page
+\renewcommand{\topfraction}{0.85} % max proportion of top figures can take
+\renewcommand{\bottomfraction}{0.85} % max proportion of top figures can take
+\renewcommand{\textfraction}{0.15} % min proportion of text on 1 page
+\renewcommand{\floatpagefraction}{0.7} % mim fraction of floatpage that can have floats
+
+%caption styles
+\usepackage[small,bf]{caption}
+\usepackage[labelformat=simple]{subcaption}
+\renewcommand\thesubfigure{(\alph{subfigure})} % see subcaption doc
+
+%% We want UK-english hyphenation patterns
+\usepackage[british]{babel}
+\usepackage{csquotes}
+
+%Remove Paragraph indenting
+\setlength{\parindent}{0.0in} 
+\setlength{\parskip}{0.1in}
+\setlength{\headheight}{21.75pt}
+
+%% Use scalable, PostScript Type 1 versions of the Computer Modern fonts.
+\usepackage{type1cm}
+%% Replace the standard Computer Modern Typewriter font LaTeX uses
+%% for monospace text with the PostScript font Adobe Courier.
+\usepackage{courier}
+\usepackage{ae,aecompl}
+\usepackage{times}
+
+% %% Redefine the font used for the section headings to
+% %% Helvetica-Narrow Bold.
+% \usepackage{sectsty}
+% \allsectionsfont{\usefont{OT1}{phv}{bc}{n}\selectfont}
+
+%to control the title formating and spaces around the titles
+%spaces under sections
+\usepackage[compact]{titlesec}
+\titlespacing{\section}{0pt}{*0}{*0}
+\titlespacing{\subsection}{0pt}{*0}{*0}
+\titlespacing{\subsubsection}{0pt}{*0}{*0}
+
+%Abbreviations or Acronyms
+\usepackage{nomencl}
+\renewcommand{\nomname}{List of Abbreviations}
+\makenomenclature
+
+% \usepackage[numbers]{cite}
+\usepackage[numbers]{natbib}
+\def\chosenbibstyle{IEEEtran}
+\def\bibfilename{bibliography_abbreviated_bibtex}
+% \usepackage[style=numeric,citestyle=numeric,natbib=true,sorting=none]{biblatex}
+% % Remove the following fields
+% \DeclareSourcemap{
+%   \maps[datatype=bibtex, overwrite]{
+%     \map{
+%       \step[fieldset=address, null]
+%       \step[fieldset=location, null]
+%       \step[fieldset=editor, null]
+%     }
+%   }
+% }
+
+% \addbibresource{zotero_references.bib} 
+% \addbibresource{additional_references.bib} 
+
+% % Turn off doi links in the bib
+% \ExecuteBibliographyOptions{doi=false,url=false}
+% % Make the titles a link
+% \newbibmacro{string+doi}[1]{%
+%   \iffieldundef{doi}
+%   {\iffieldundef{url}{#1}{\href{\thefield{url}}{#1}}}
+%   {\href{http://dx.doi.org/\thefield{doi}}{#1}}}
+% \newbibmacro{eprint-nolink}[1]{%
+%   \iffieldundef{eprint}
+%   {\iffieldundef{url}{#1}{\href{\thefield{url}}{#1}}}
+%   {\href{http://dx.doi.org/\thefield{doi}}{#1}}}
+% \DeclareFieldFormat[misc,article,inproceedings,book,thesis,incollection,report]{title}{\usebibmacro{string+doi}{\mkbibquote{#1}}}
+
+
+% % Only show arxiv eprints, but with no link
+% \DeclareFieldFormat{eprint}{} 
+% \DeclareFieldFormat{eprint:arxiv}{arXiv: \thefield{eprint}} 
+
+% % ISSN is disabled via isbn=false, but I want isbn for books.
+% \DeclareFieldFormat{issn}{} 
+
+% Don't need to know the address of whatever
+% \DeclareFieldFormat{location}{} 
+% \DeclareFieldFormat{address}{} 
+
+\usepackage{hyperref}
+%\hypersetup{colorlinks=true,citecolor=blue}
+\hypersetup{colorlinks=true,citecolor=Tblue,linkcolor=black,urlcolor=Tblue}
+%To change box color around the links and citations, you have these other options:
+%\hypersetup{citebordercolor=Violet,filebordercolor=Red,linkbordercolor=Blue}
+
+% Cleveref must be loaded after hyperref
+\usepackage[capitalise]{cleveref} % Auto references
+
+\newcommand*\makeAlph[1]{\symbol{\numexpr64+#1}} % A,B,C,...
+
+
+% Add Assumption type to cleveref 
+\crefformat{assumption}{Assumption~#2#1#3}
+\crefrangeformat{assumption}{Assumptions~(#3#1#4) to~(#5#2#6)}
+\crefmultiformat{assumption}{Assumptions~#2#1#3}%
+{ and~#2#1#3}{, #2#1#3}{ and~#2#1#3}
+
+
+% Add Paper type to cleveref
+%% Define a counter that we can use for references
+\newcounter{paper}
+%% Convenience command to label papers (prints a ref to the paper)
+\newcommand{\labelpaper}[1]{{\refstepcounter{paper}\label{#1}}\cref{#1}}
+%% Convenience command to turn numbers into capital letters (1->A, 2->B, ...)
+%% Define how the reference will look (Paper A, Paper B, etc)
+\crefformat{paper}{Paper~#2\makeAlph{#1}#3}
+\crefrangeformat{paper}{Papers~#3\makeAlph{#1}#4 to~#5\makeAlph{#2}#6}
+\crefmultiformat{paper}{Papers~#2\makeAlph{#1}#3}%
+{ and~#2\makeAlph{#1}#3}{, #2\makeAlph{#1}#3}{ and~#2\makeAlph{#1}#3}
+
+
+
+% Add RQ type to cleveref
+%% Define a counter that we can use for references
+\newcounter{rq}
+% \renewcommand{\therq}{\Roman{rq}}
+%% Convenience command to label papers (prints a ref to the paper)
+\newcommand{\labelrq}[1]{{\refstepcounter{rq}\label{#1}}\cref{#1}}
+%% Convenience command to turn numbers into capital letters (1->A, 2->B, ...)
+%% Define how the reference will look (Paper A, Paper B, etc)
+\crefformat{rq}{RQ~#2#1#3}
+\crefrangeformat{rq}{RQs~#3#1#4 to~#5\makeRoman{#2}#6}
+\crefmultiformat{rq}{RQs~#2#1#3}%
+{ and~#2#1#3}{, #2#1#3}{ and~#2#1#3}
+
+  
+% Extra commands for tables, like \midrule
+\usepackage{booktabs}
+
+% Special table stuff
+\usepackage{array}
+\usepackage{multirow}
+\usepackage{dcolumn}
+\newcommand{\PreserveBackslash}[1]{\let\temp=\\#1\let\\=\temp}
+\newcolumntype{d}{D{.}{.}{-2}}
+\newcolumntype{C}[1]{>{\PreserveBackslash\centring}p{#1}}
+\newcolumntype{R}[1]{>{\PreserveBackslash\raggedleft}p{#1}}
+\newcolumntype{L}[1]{>{\PreserveBackslash\raggedright}p{#1}} 
+\newcolumntype{x}[1]{>{\centring\let\newline\\\arraybackslash\hspace{0pt}}p{#1}} % You can specify cell width, but is centred
+
+
+% Fancy chapter options, no options seems to reset the font set by sectsty
+\usepackage{fncychap}
+
+
+
+
+%graphics
+\usepackage{epstopdf} %support for eps.
+\DeclareGraphicsExtensions{.eps,.ps,.pdf,.png,.jpg}
+\usepackage{float} % figure placing [H]
+
+
+%Section Numbering and TOC depth
+\setcounter{secnumdepth}{2}
+\setcounter{tocdepth}{2}
+
+
+%Algorithms
+% \usepackage[ruled,vlined]{algorithm2e}  % Algorithms with style
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+
+% Number the algos by chapter
+% algorithm2e has options for this, but isn't compatible with 
+% algpseudocode. Oh well!
+% https://tex.stackexchange.com/questions/124902/algorithm-with-chapter-number
+\makeatletter 
+\renewcommand\thealgorithm{\thechapter.\arabic{algorithm}} 
+\@addtoreset{algorithm}{chapter} 
+\makeatother
+
+
+% Glossary
+\usepackage[acronym, nomain, automake]{glossaries-extra} 
+\renewcommand*{\glstextformat}[1]{\textcolor{black}{#1}}
+\glssetcategoryattribute{acronym}{glossdesc}{title}
+\setabbreviationstyle[acronym]{long-short}
+% extra acronym stuff
+\glsaddkey*{adjective}{???}{\glsentryadj}{\Glsentryadj}{\glsadjx}{\Glsadjx}{\GLSadjx}
+
+\newcommand{\ADJglspostlinkhook}{\ifglsused{\glslabel}{}{ (\glsentryshort{\glslabel})}\glsunset{\glslabel}}
+\newcommand{\glsadj}[1]{{\let\glspostlinkhook\ADJglspostlinkhook\ifglsused{#1}{\gls{#1}}{\glsadjx{#1}}}}
+\newcommand{\Glsadj}[1]{{\let\glspostlinkhook\ADJglspostlinkhook\ifglsused{#1}{\Gls{#1}}{\Glsadjx{#1}}}}
+\newcommand{\GLSadj}[1]{{\let\glspostlinkhook\ADJglspostlinkhook\ifglsused{#1}{\GLS{#1}}{\GLSadjx{#1}}}}
+\input{definitions/glossary}
+\makeglossaries
+
+\input{definitions/symbols.tex}
+
+
+% Adjusts letter placement etc, seems to fix a lot of over/underfull issues
+\usepackage[final]{microtype}

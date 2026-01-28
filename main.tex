@@ -1,0 +1,121 @@
+%\documentclass[a4crop]{ntnuthesis} 
+\documentclass{ntnuthesis}  
+\input{main_preamble.tex}
+\usepackage{subfiles} % Place after preamble so the subfiles use the same packages/definitions
+
+% Compile each chapter as a separate file (much faster compilation).
+% https://www.overleaf.com/learn/latex/Multi-file_LaTeX_projects#The_standalone_package
+% The sub-files use the same preamble as this one.
+% This import should be at the end of the preamble!
+% \usepackage{subfiles}
+
+\begin{document}
+
+%Titles
+\title{Topics in Control}
+\author{Bjørn Kåre Sæbø}
+\degreetype{Philosohiae Doctor}
+\faculty{Faculty of Information Technology and Electrical Engineering}
+\department{Department of Engineering Cybernetics}
+% \copyrightnotice{All rights reserved}
+\isbnprinted{978-82-326-7040-6}
+\isbnelectronic{978-82-326-7039-0} 
+\serialnumber{2023:168}
+\setyear{2025}
+\setmonth{August}
+\setITKreportnr{2023-11-W}
+
+\frontmatter
+\maketitle
+
+%% Configuration of the header strings for the frontmatter pages.
+\fancyhead[RO]{{\footnotesize\rightmark}\hspace{1em}\thepage}
+\fancyhead[LE]{\thepage\hspace{1em}\footnotesize{\leftmark}}
+\fancyhead[RE,LO]{}
+\fancyhead[RO]{{\footnotesize\rightmark}\hspace{1em}\thepage}
+
+%Summary
+\input{sections/F03-ABSTRACT.tex}
+\input{sections/F04-PREFACE.tex}
+
+% %TOC
+\tableofcontents
+\addcontentsline{toc}{chapter}{Contents} 
+\cleardoublepage
+
+% % List of tables
+\listoftables
+\addcontentsline{toc}{chapter}{List of Tables}
+\cleardoublepage
+
+% List of figures
+\listoffigures
+\addcontentsline{toc}{chapter}{List of Figures}
+\cleardoublepage
+
+%Abbreviations and symbols
+\printglossary[%
+  type=acronym,%
+  style=index,%
+  nonumberlist,%
+  nogroupskip% Removes additonal space between alphabetical groups
+]
+%\thispagestyle{empty}
+% \printnomenclature
+\cleardoublepage
+
+%Symbols
+% \newpage
+% \chapter*{List of Symbols\hfill}
+% \addcontentsline{toc}{chapter}{List of Symbols}
+% \begin{flushleft}
+%   \input{symbols}
+% \end{flushleft}
+
+\mainmatter
+
+\cleardoublepage
+% \input{sections/F01-copyright}
+% %\input{sections/F02-dedication}
+% \input{sections/F03-ABSTRACT.tex}
+% \input{sections/F04-PREFACE.tex}
+%\input{sections/F05-acknowledgements}
+% %
+% %Chapters
+\subfile{sections/F10-INTRODUCTION.tex}
+
+% \subfile{sections/F20-PRELIMINARIES.tex}
+
+% \subfile{sections/F30-MODELING.tex}
+
+
+% \part{Positioning Strategies in Vortex Streets for Energy Harvesting}
+% \chapter{Optimal Positioning in Vortex Streets using Extremum-Seeking Control}
+% \subfile{sections/F40-ESC.tex}
+% \chapter{Automatic Alignment with Vortex Streets through Weatherwaning}
+% \subfile{sections/F50-WEATHERWANING.tex}
+% \chapter{Experimental Investigation of Optimal Positioning}
+% \subfile{sections/F60-EXPERIMENTS.tex}
+% \part{Phase-ambivalent Gait Control for Swimming}
+% \chapter{Energy-shaping and Phase Control through Angle-action Reformulation}
+% \subfile{sections/F70-CAMS.tex}
+% \chapter{Local Energy-shaping and Synchronization for Constant-parameter Gait Generation}
+% \subfile{sections/F80-CDC.tex}
+% \chapter{Synchronization and Mean-field Amplitude-shaping for Varying-parameter Gait Generation}
+% \subfile{sections/F90-TAC.tex}
+% \chapter{Adaptive Phase-ambivalent Gait Control}
+% \subfile{sections/F100-ADAPTIVE.tex}
+% \bibliographystyle{\chosenbibstyle}
+% \bibliography{\bibfilename}
+% % \bibliography{references_zotero2}
+% % \printbibliography
+
+% %<<byman
+% % Configuration of the header strings for the Appendices
+% \renewcommand{\chaptermark}[1]{%
+%   \markboth{\MakeUppercase{\appendixname\ \thechapter}}%
+%   {\MakeUppercase{#1}}
+% }
+% \fancyhead[RE,LO]{}
+
+\end{document}

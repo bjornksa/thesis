@@ -1,0 +1,205 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%% Math commands %%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Generally useful
+
+% Vector or matrix (boldface)
+% \newcommand\vm[1]{\boldsymbol{\mathrm{#1}}}
+\newcommand\vm[1]{\bm{#1}}
+
+% P-norm
+\newcommand\norm[2][\empty]{\lVert#2\rVert_{#1}}
+
+% R^n
+\newcommand\R[1][\empty]{\mathbb{R}^{#1}}
+
+% C^n
+\newcommand\C[1][\empty]{\mathbb{C}^{#1}}
+
+% Identity
+\newcommand\I[1][\empty]{\vm{I}_{#1}}
+
+% Transpose
+\gdef\T{^{\top}}
+
+% Inverse
+\gdef\inv{^{-1}}
+
+% Moore-Penrose Pseudoinverse
+\gdef\mpp{^{+}}
+
+% Set of elements
+\newcommand\set[1]{\left\{#1\right\}}
+
+% Span of vectors (\span was taken, sadly :( )
+\newcommand\spn[1]{\textnormal{span}\left(#1\right)}
+
+% Range of matrix
+\newcommand\ran[1]{\textnormal{range}\left(#1\right)}
+
+% Orthogonal complement
+\gdef\orth{^{\perp}}
+
+% Better trigonometric functions if one wants
+
+
+% \let\oldcos\cos
+% \renewcommand\cos[1]{\oldcos{\left(#1\right)}}
+% \newcommand\scos[1]{\oldcos{^2\left(#1\right)}}
+
+% \let\oldsin\sin
+% \renewcommand\sin[1]{\oldsin{\left(#1\right)}}
+% \newcommand\ssin[1]{\oldsin{^2\left(#1\right)}}
+
+% \let\oldtan\tan
+% \renewcommand\tan[1]{\oldtan{\left(#1\right)}}
+% \newcommand\stan[1]{\oldtan{^2\left(#1\right)}}
+
+% Hadamard product (slightly unnecessary? less readable? more readable?)
+\let\hprod\odot
+
+% Hadamard power
+\newcommand\hpow[1]{^{\circ#1}}
+
+% Kronecker product
+\let\kron\otimes
+
+% Slightly more meaningful names for pos.def, neg.def notation
+
+% Pos. def, "matrix greater than"
+\let\mgt\succ
+
+% Neg. def
+\let\mlt\prec
+
+% Pos. semidef.
+\let\mgeq\succcurlyeq
+
+% Neg. semidef
+\let\mleq\preccurlyeq
+
+% Better real and imaginary part if one wants
+
+% \let\oldRe\Re
+% \renewcommand\Re[1]{\oldRe\left(#1\right)}
+
+% \let\oldIm\Im
+% \renewcommand\Im[1]{\oldIm\left(#1\right)}
+
+%% Slightly more specific useful stuff
+
+% Vectors with optional index and derivatives
+\renewmathcommand\v[2][\empty]{\vm{#2}_{#1}}
+\newcommand\dv[2][\empty]{\dot{\vm{#2}}_{#1}}
+\newcommand\ddv[2][\empty]{\ddot{\vm{#2}}_{#1}}
+
+% Scalars with optional index and derivatives
+\newcommand\s[2][\empty]{#2_{#1}}
+\newcommand\ds[2][\empty]{\dot{#2}_{#1}}
+\newcommand\dds[2][\empty]{\ddot{#2}_{#1}}
+
+% Vectors tilde with optional index and derivatives
+
+\newcommand\vt[2][\empty]{\tilde{\vm{#2}}_{#1}}
+\newcommand\dvt[2][\empty]{\dot{\tilde{\vm{#2}}}_{#1}}
+\newcommand\ddvt[2][\empty]{\ddot{\tilde{\vm{#2}}}_{#1}}
+
+% Vectors hat with optional index and derivatives
+\newcommand\vh[2][\empty]{\hat{\vm{#2}}_{#1}}
+\newcommand\dvh[2][\empty]{\dot{\hat{\vm{#2}}}_{#1}}
+\newcommand\ddvh[2][\empty]{\ddot{\hat{\vm{#2}}}_{#1}}
+
+% Vectors bar with optional index and derivatives
+\newcommand\vb[2][\empty]{\bar{\vm{#2}}_{#1}}
+\newcommand\dvb[2][\empty]{\dot{\bar{\vm{#2}}}_{#1}}
+\newcommand\ddvb[2][\empty]{\ddot{\bar{\vm{#2}}}_{#1}}
+
+% Scalars tilde with optional index and derivatives
+\newcommand\st[2][\empty]{\tilde{#2}_{#1}}
+\newcommand\dst[2][\empty]{\dot{\tilde{#2}}_{#1}}
+\newcommand\ddst[2][\empty]{\ddot{\tilde{#2}}_{#1}}
+
+% Scalars hat with optional index and derivatives
+\newcommand\sh[2][\empty]{\hat{#2}_{#1}}
+\newcommand\dsh[2][\empty]{\dot{\hat{#2}}_{#1}}
+\newcommand\ddsh[2][\empty]{\ddot{\hat{#2}}_{#1}}
+
+% Scalars bar with optional index and derivatives
+% note: the first of these commands overwrite the "\sb{}" command which can be used instead of _{} to yield subscript. But who uses that?
+\renewcommand\sb[2][\empty]{\bar{#2}_{#1}}
+\newcommand\dsb[2][\empty]{\dot{\bar{#2}}_{#1}}
+\newcommand\ddsb[2][\empty]{\ddot{\bar{#2}}_{#1}}
+
+\newcommand\conj[1]{\overline{#1}}
+\newcommand\upto[2][0]{\set{#1\dots #2}}
+\newcommand\ceil[1]{\left\lceil#1\right\rceil}
+\newcommand\floor[1]{\left\lfloor#1\right\rfloor}
+
+%maybe figure these two out
+\newcommand\der[2][]{\frac{\mathrm{d} #1}{\mathrm{d} #2}}
+\newcommand\pder[2][]{\frac{\partial#1}{\partial#2}}
+\newcommand\lder{\mathcal{L}}
+
+\let\atan\arctan
+\let\vphi\varphi
+\DeclareMathOperator{\diag}{diag}
+
+\gdef\i{\ensuremath{\mathrm{i}}}
+\DeclareMathOperator{\sgn}{\mathrm{sgn}}
+
+% \DeclareMathOperator{\uh}{^{\wedge}}
+\def\uh{^{\wedge}}
+% \DeclareMathOperator{\lh}{^{\vee}}
+\def\lh{^{\vee}}
+
+\newcommand\abs[1]{\left|#1\right|}
+
+\makeatletter
+\renewenvironment{proof}[1][\relax]{\par
+  \pushQED{\qed}%
+  \normalfont \topsep6\p@\@plus6\p@\relax
+  \trivlist
+  \item[\hskip\labelsep\bfseries
+    \ifx#1\relax \proofname\else#1\fi\@addpunct{.}]\ignorespaces
+}{%
+  \popQED\endtrivlist\@endpefalse
+}
+\makeatother
+
+\renewcommand{\qedsymbol}{$\blacksquare$}
+
+\newtheorem{prop}{Proposition}
+\newtheorem{lemma}{Lemma}
+\newtheorem{theorem}{Theorem}
+\newtheorem{remark}{Remark}
+\newtheorem{assumption}{Assumption}
+\newtheorem{definition}{Definition}
+\newtheorem{corollary}{Corollary}
+
+\makeatletter
+\providecommand{\examplesymbol}{\ensuremath\blacktriangle}
+\newenvironment{example}[1][\examplename]{\par
+  \pushQED{\qed}%
+  \normalfont \topsep6\p@\@plus6\p@\relax
+  \begingroup
+  \let\qedsymbol\examplesymbol
+      \trivlist
+
+  \item[\hskip\labelsep
+        \itshape
+    #1\@addpunct{.}]\ignorespaces
+}{%
+  \popQED\endtrivlist\@endpefalse
+  \endgroup
+}
+\providecommand{\examplename}{Example}
+\makeatother
+
+\crefname{prop}{Proposition}{Propositions}
+\crefname{lemma}{Lemma}{Lemmas}
+\crefname{theorem}{Theorem}{Theorems}
+\crefname{assumption}{Assumption}{Assumptions}
+\crefname{definition}{Definition}{Definitions}
+\crefname{remark}{Remark}{Remarks}
+\crefname{equation}{}{}
+\crefname{corollary}{Corollary}{Corollaries}

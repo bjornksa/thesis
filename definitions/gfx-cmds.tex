@@ -1,0 +1,41 @@
+
+
+% Make a custom legend for my plots
+% argument #1: any options
+\makeatletter
+\newenvironment{customlegend}[1][]{%
+    \begingroup
+    % inits/clears the lists (which might be populated from previous
+    % axes):
+    \pgfplots@init@cleared@structures
+    \pgfplotsset{#1}%
+}{%
+    % draws the legend:
+    \pgfplots@createlegend
+    \endgroup
+}%
+
+% makes \addlegendimage available (typically only available within an
+% axis environment):
+\def\addlegendimage{\pgfplots@addlegendimage}
+\makeatother
+
+% \todo{Remove this and scale the plots properly in tikz}
+% Used for figure scaling in chapter 4.2
+\newcommand{\tikzFigureScale}{0.55}
+
+
+%% General convenience %%
+
+
+%% Drawing
+% \newcommand{\tikzdot}[2][red,fill=red]{\tikz[baseline=-0.5ex]\draw[#1,radius=#2] (0,0) circle ;}%
+\newcommand{\drawbar}[1]{\begin{tikzpicture}\draw [white] (0,0) rectangle (\myfontsize, \myfontsize); \draw [#1] (0, 0.25*\myfontsize) -- (0.333*\myfontsize, 0.25*\myfontsize); \end{tikzpicture}}
+
+\newcommand{\drawdash}[1]{\begin{tikzpicture}\draw [white] (0,0) rectangle (\myfontsize, \myfontsize);\draw [#1] (0, 0.25*\myfontsize) -- (0.333*\myfontsize, 0.25*\myfontsize);\draw [#1] (0.666*\myfontsize, 0.25*\myfontsize) -- (\myfontsize, 0.25*\myfontsize);\end{tikzpicture}}
+
+
+
+
+
+
