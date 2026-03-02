@@ -1,0 +1,16 @@
+# Fdb version 4
+["pdflatex"] 1772443929.52027 "/Users/bjornksa/Documents/thesis/sections/old/F70-CAMS.tex" "out/F70-CAMS.pdf" "F70-CAMS" 1772443929.61538 2
+  "/Users/bjornksa/Documents/thesis/sections/old/F70-CAMS.tex" 1772443928.93161 782 4ff93fdad7cc782d9c34325f41dd16a0 ""
+  "/opt/homebrew/Cellar/texlive/20250308_2/share/texmf-dist/tex/latex/import/import.sty" 1741388039 6201 0ad8b5da8e12f60a88d546b2198a56f2 ""
+  "/opt/homebrew/Cellar/texlive/20250308_2/share/texmf-dist/tex/latex/subfiles/subfiles.cls" 1741388039 1507 57de335d88fde4e5c924dfed577fdb74 ""
+  "/opt/homebrew/Cellar/texlive/20250308_2/share/texmf-dist/web2c/texmf.cnf" 1741388039 42151 79f67285bdd95beca4d137b380b4b9e5 ""
+  "/opt/homebrew/Cellar/texlive/20250308_2/share/texmf-var/web2c/pdftex/pdflatex.fmt" 1741388039 3346125 851abcc596872d7f7285a006ccee0040 ""
+  "F70-CAMS.tex" 1772443928.93161 782 4ff93fdad7cc782d9c34325f41dd16a0 ""
+  "main.tex" 0 -1 0 ""
+  "out/F70-CAMS.aux" 0 -1 0 "pdflatex"
+  "out/main.tex" 0 -1 0 ""
+  (generated)
+  "out/F70-CAMS.aux"
+  "out/F70-CAMS.log"
+  "out/F70-CAMS.pdf"
+  (rewritten before read)

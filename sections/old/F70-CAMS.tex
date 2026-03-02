@@ -1,10 +1,11 @@
-\documentclass[main.tex]{subfiles}
+\documentclass[../main.tex]{subfiles}
 
 \begin{document}
 
 I suppose it's possible to include several files (one for each section) in this file, personally I'll just write everything for a given chapter directly in this file to avoid a very deeply nested file structure.
 
 Nice thing is that~\cite{khalilNonlinearSystems2002},~\cite{kelasidiModelingUnderwaterSnake2014},~\cite{liljebackControllabilityStabilityAnalysis2010} works (due to the little command at the end of the file, keep it when making new chapter files) both when compiling this file separately and when compiling the \texttt{main.tex} file.
+
 \ifSubfilesClassLoaded{%
   \bibliographystyle{\chosenbibstyle}
   \bibliography{\bibfilename}

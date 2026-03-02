@@ -1,0 +1,9 @@
+PWD /Users/bjornksa/Documents/thesis/sections/old
+INPUT /opt/homebrew/Cellar/texlive/20250308_2/share/texmf-dist/web2c/texmf.cnf
+INPUT /opt/homebrew/Cellar/texlive/20250308_2/share/texmf-var/web2c/pdftex/pdflatex.fmt
+INPUT /Users/bjornksa/Documents/thesis/sections/old/F70-CAMS.tex
+OUTPUT out/F70-CAMS.log
+INPUT /opt/homebrew/Cellar/texlive/20250308_2/share/texmf-dist/tex/latex/subfiles/subfiles.cls
+INPUT /opt/homebrew/Cellar/texlive/20250308_2/share/texmf-dist/tex/latex/subfiles/subfiles.cls
+INPUT /opt/homebrew/Cellar/texlive/20250308_2/share/texmf-dist/tex/latex/import/import.sty
+INPUT /opt/homebrew/Cellar/texlive/20250308_2/share/texmf-dist/tex/latex/import/import.sty

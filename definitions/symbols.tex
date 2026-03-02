@@ -7,8 +7,6 @@
 % \newcommand\vm[1]{\boldsymbol{\mathrm{#1}}}
 \newcommand\vm[1]{\bm{#1}}
 
-% P-norm
-\newcommand\norm[2][\empty]{\lVert#2\rVert_{#1}}
 
 % R^n
 \newcommand\R[1][\empty]{\mathbb{R}^{#1}}
@@ -144,15 +142,27 @@
 \let\vphi\varphi
 \DeclareMathOperator{\diag}{diag}
 
+% Useful math operators
+\DeclareMathOperator{\Ad}{Ad}
+\DeclareMathOperator{\ad}{ad}
+\DeclareMathOperator{\sgn}{sgn}
+\DeclareMathOperator{\blkdiag}{blkdiag}
+
+\newcommand{\norm}[1]{\left\lVert#1\right\rVert}
+\newcommand{\abs}[1]{\left|#1\right|}
+\newcommand{\absign}[1]{\lceil#1\rfloor} % Signed absolute value
+
+
+
 \gdef\i{\ensuremath{\mathrm{i}}}
-\DeclareMathOperator{\sgn}{\mathrm{sgn}}
+% \DeclareMathOperator{\sgn}{\mathrm{sgn}}
 
 % \DeclareMathOperator{\uh}{^{\wedge}}
 \def\uh{^{\wedge}}
 % \DeclareMathOperator{\lh}{^{\vee}}
 \def\lh{^{\vee}}
 
-\newcommand\abs[1]{\left|#1\right|}
+% \newcommand\abs[1]{\left|#1\right|}
 
 \makeatletter
 \renewenvironment{proof}[1][\relax]{\par

@@ -1,0 +1,16 @@
+# Fdb version 4
+["pdflatex"] 1772462024.84849 "/Users/bjornksa/Documents/thesis/sections/old/F80-CDC.tex" "out/F80-CDC.pdf" "F80-CDC" 1772462024.98624 2
+  "/Users/bjornksa/Documents/thesis/sections/old/F80-CDC.tex" 1772462024.25068 715 dbe3465d009a3f779fcf93229cdd401f ""
+  "/opt/homebrew/Cellar/texlive/20250308_2/share/texmf-dist/tex/latex/import/import.sty" 1741388039 6201 0ad8b5da8e12f60a88d546b2198a56f2 ""
+  "/opt/homebrew/Cellar/texlive/20250308_2/share/texmf-dist/tex/latex/subfiles/subfiles.cls" 1741388039 1507 57de335d88fde4e5c924dfed577fdb74 ""
+  "/opt/homebrew/Cellar/texlive/20250308_2/share/texmf-dist/web2c/texmf.cnf" 1741388039 42151 79f67285bdd95beca4d137b380b4b9e5 ""
+  "/opt/homebrew/Cellar/texlive/20250308_2/share/texmf-var/web2c/pdftex/pdflatex.fmt" 1741388039 3346125 851abcc596872d7f7285a006ccee0040 ""
+  "F80-CDC.tex" 1772462024.25068 715 dbe3465d009a3f779fcf93229cdd401f ""
+  "main.tex" 0 -1 0 ""
+  "out/F80-CDC.aux" 1772462024.84789 32 3985256e7290058c681f74d7a3565a19 "pdflatex"
+  "out/main.tex" 0 -1 0 ""
+  (generated)
+  "out/F80-CDC.aux"
+  "out/F80-CDC.log"
+  "out/F80-CDC.pdf"
+  (rewritten before read)
