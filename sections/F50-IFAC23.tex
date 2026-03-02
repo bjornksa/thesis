@@ -1,0 +1,603 @@
+\documentclass[../main.tex]{subfiles}
+
+\begin{document}
+
+\chapter{Model based Multiple Task Priority in the Presence of Modeling Errors}
+
+\section{Introduction}
+% \todo[inline]{Kan ha et veldig tidlig statement om algebraic loop i modellfeil-OSC og hvordan det ikke har vært mye fokus på det før. The presence of the algebraic loop is hardly mentioned in the literature but remains one of the biggest }
+% \todo[inline]{Bilde av Eelume på første side}
+Underwater vehicle-manipulator systems (UVMSs) are generally kinematically redundant with respect to their end-effector configuration. This redundancy can be leveraged in order to execute additional objectives simultaneously. Depending on the system at hand, it is preferable to resolve the redundancy either at the kinematic or the dynamic level. For systems with sufficiently quick dynamics, it is tractable to resolve the redundancy at the kinematic level. Conversely, for systems with slower dynamics, such an approach is generally ill-advised. Additionally, some classes of UVMSs suffer from significant coupling forces caused by joint motions \citep{Borlaug2022}. In order to instead resolve the redundancy on the dynamic level, it is possible to apply the results of \cite{Khatib2004} which extended the well-known operational space formulation (OSF) \citep{Khatib1987} to a task-priority framework.
+% Eller skal det være Khatib et al. 2004 her?
+% \begin{figure}[b]
+%      \vspace{-3mm}
+%     \centering
+%     \includegraphics[width=0.8\linewidth]{figures/IFAC23/Eelume/eelume.png}
+%      \vspace{-3mm}
+%     \caption{The Eelume AIAUV, a highly redundant UVMS}
+%     \label{fig:eel}
+% \end{figure}
+In order to achieve effective redundancy resolution of UVMSs, we wish to apply task-priority operational space control (OSC). However, OSC relies heavily on knowledge of the kinematics and dynamics of the system. There exist many systems in which an accurate model cannot be obtained, particularly with respect to their dynamic parameters. It is in general not possible to maintain strict dynamic priority in the task hierarchy in this case.%Generally it is not possible to maintain strict dynamic priority in the task hierarchy when such is the case, and thus, convergence of the high-priority tasks may only be guaranteed statically.
+
+The existing literature on this topic is limited, especially regarding theoretical results. A comparison of OSC strategies is given in \cite{Nakanishi2008}, where the effects of modelling errors are mentioned but only analyzed empirically. Adaptive control has been applied to improve the model knowledge in task-priority methods in \cite{Lee2019} and \cite{Garofalo2021}. The effects of imperfect model knowledge can also be dealt with through robust control, e.g. by using sliding mode control (SMC). In \cite{slotine1988}, first-order SMC is applied for an end-effector regulation task in the presence of uncertainties. To the authors' knowledge, there exists no literature on higher-order SMC in OSC. In \cite{Antonelli2018a, Dilillo2021}, the effects of dynamic model errors in task-priority OSC is investigated, both with compatible and incompatible tasks. It is shown that only the restoring forces affect steady-state errors of a task. The work considers regulation control, and is limited to two tasks, implemented on a fixed-base robot. The present work is motivated by extending this analysis to task trajectory tracking for vehicle-manipulator systems (VMSs).
+
+In this paper, the task-priority OSC problem with an arbitrary number of tasks is formulated for UVMSs subjected to dynamic model parameter uncertainties. The resulting task-level dynamics in the presence of imperfect cancellation of the system dynamics is analyzed for an arbitrary number of tasks. The analysis reveals that the dynamics suffer from an algebraic loop when the system inertia estimate is erroneous. An attempt to achieve task trajectory tracking in spite of this is made by implementing a super-twisting algorithm (STA) at each task level. The STA attenuates chattering compared to conventional SMC, which is important for systems with slow dynamics, while retaining robustness. Lastly, a simulation study with an articulated intervention autonomous underwater vehicle (AIAUV) (cf. Fig. \ref{fig:eel}) is conducted and supports the presented theory. The AIAUV is a subclass of UVMSs which is particularly challenging to model correctly. The results of this paper hold also for other VMSs in general.
+
+The paper is organized as follows. The mathematical model of a general UVMS is presented in Section \ref{sec:background}. In Section \ref{sec:inverse dynamics}, the OSC problem is described with and without modelling errors. Furthermore, a task-level super-twisting controller is proposed to provide robustness to dynamic model errors. A theoretical stability analysis is given in Section \ref{sec:stability analysis}. The proposed method is validated through a simulation study in Section \ref{sec:sim}. Lastly, Section \ref{sec:conclusions} presents conclusions and future work.
+
+%In this paper we consider the particular challenges of vehicle manipulator systems (VMS). That is systems consisting of a base, and a manipulator arm. VMSs are always redundant regarding end-effector positioning, as there will be the choice between moving the system base or moving the manipulator. This redundancy must be taken into account in the control design, and makes the VMS a natural vehicle for task-priority control methods which utilize this redundancy.
+
+%Modellering av undervannsting bør cite noen av notes3 sine referanser.
+
+%Generelt OSC kan nevne \citep{Khatib1987}, \cite{Nakanishi2008} (han snakker også om problemer med moddeleringsfeil), \citep{Ott2020} er sikkert alltid relevant
+
+%Styring av AUV bør nevne Erlend, Ida, Iversflaten. En meget lur type \citep{Sabo2022} applies \citep{Ott2020} to AIAUV and implements SMC at the task level.
+
+%Det fins en masteroppgave av Arnt Erik Stene som heter "Robust Control for Articulated Intervention AUVs in the Operational Space", men den er sikkert ikke relevant i det hele tatt. I samme gate har vi \cite{Londhe2017}
+
+%In a VMS, there are infinitely many poses with the same end-effector pose due to the different possible combinations of the system base and manipulator arm. The same holds true for any control objective where not all the degrees of freedom (DoF) of the system are required.
+%When choosing a control approach, this redundancy must be taken into account. One method of redundancy resolution is task priority control methods, where redundant degrees of freedom are utilized to complete secondary tasks.
+
+%Task priority methods can be broadly organized into three categories, optimization based methods such as \cite{Basso2020_QP} \todo[inline]{Eldre citations for optimaliseringsbasert}, and nullspace based methods either at the kinematic level such as \cite{Chiaverini1997} or at the dynamic level \cite{Khatib2004}. Nullspace based methods project tasks into the nullspace of the higher prioritized tasks, so that the higher prioritized tasks will not be affected.
+
+%The kinematic level methods in general do not take into account any dynamical coupling that might be present between tasks, relying instead on a dynamic controller to track generated velocities. Since the use case motivating this article is for UVMS, where there is a strong coupling between end effector and base movement, kinematic level task priority is not well suited for our need. But it has still been applied successfully before \citep{Antonelli1998}. Cite Iversflaten2022
+
+%Dynamic level task space control was introduced in \cite{Khatib1987}, where the end-effector was controlled in cartesian coordinates while minimizing the kinetic energy of the system. This was extended to work for $n$ tasks in \cite{Khatib2004b}. This has been applied to UVMS in \cite{Basso2020_OSC}.
+
+%Another dynamic level approach is the passivity based method in \cite{Ott2020} which focuses on compliant behaviour in the task coordinates. This was extended to VMS in \cite{Sabo2022}, where using SMC at the task level was also investigated.
+
+\section{Mathematical Model}\label{sec:background}
+The equations of motion for a UVMS can be expressed in a body-fixed reference frame as \citep{From2014}
+\begin{subequations}
+\label{eq:vms_motion_eqs}
+\begin{align}
+    \label{subeq:kinematics}
+    \dot{\bm{\xi}} &= \bm{J}_{\bm{\xi}}(\bm{q}) \bm{\zeta} \\
+    \label{subeq:dynamics}
+        \bm{M}(\bm{\theta})\dot{\bm{\zeta}}
+        + \bm{C}(\bm{\theta}, \bm{\zeta})\bm{\zeta}
+        + \bm{D}(\bm{\theta}, \bm{\zeta})\bm{\zeta}
+        + \bm{g}(\bm{\xi})
+        &= \bm{\tau}.
+    \end{align}
+\end{subequations}
+The system configuration of a UVMS equipped with an $n$-joints manipulator arm is defined as $\bm{\xi} \triangleq \left[\bm{\eta}^T, \bm{\theta}^T\right]^T$, where $\bm{\eta} \triangleq \left[ (\bm{p}^I_{IB})^T, \bm{q}^T \right]^T \in \mathbb{R}^7$ is the position and attitude of the base frame with respect to the inertial frame and $\bm{\theta} \in \mathbb{R}^n$ is the vector of joint angles. The attitude is parametrized by the quaternion $\bm{q} \triangleq \left[\eta,\bm{\epsilon}^T\right]^T \in \mathbb{R}^4$ such that $\norm{\bm{q}}_2 = 1$, where $\eta$ denotes the real part and $\bm{\epsilon}$ denotes the vector part of $\bm{q}$. The body-fixed velocities are denoted $\bm{\zeta} \triangleq
+\left[
+    (\boldsymbol{v}_{IB}^I)^T,
+    (\boldsymbol{\omega}_{IB}^I)^T,
+    \dot{\boldsymbol{\theta}}^T
+\right]^T$, where $\bm{v}_{IB}^I \in \mathbb{R}^3$ are the linear velocities,
+$\bm{\omega}_{IB}^I \in \mathbb{R}^3$ are the angular velocities,
+and $\dot{\bm{\theta}} \in \mathbb{R}^n$
+are the joint velocities. The body-fixed and inertial velocities in \eqref{subeq:kinematics} are related through the kinematic relationship
+\begin{equation}
+    \bm{J}_{\bm{\xi}} =
+    \begin{bmatrix}
+        \bm{R}^I_B(\bm{q}) & \bm{0}_{3\times 3} & \bm{0}_{3\times n} \\
+        \bm{0}_{4\times 3} & \bm{T}_{\bm{q}}(\bm{q}) & \bm{0}_{4\times n} \\
+        \bm{0}_{n\times 3} & \bm{0}_{n\times 3} & \bm{I}_{n}
+    \end{bmatrix}, \
+    \bm{T}_{\bm{q}}(\bm{q}) =
+    \dfrac{1}{2}
+    \begin{bmatrix}
+        -\bm{\epsilon}^T \\
+        \eta \bm{I}_3 + S(\bm{\epsilon})
+    \end{bmatrix},
+    %\raisetag{1.9\baselineskip} %Veldig hacky løsning
+\end{equation}
+wherein $\bm{R}^I_B \in \text{SO}(3)$ describes the rotation from the body-fixed frame to the inertial frame and $S:\mathbb{R}^3 \mapsto \mathfrak{so}(3)$ is the skew-symmetry map. The dynamics of \eqref{subeq:dynamics} are described by the positive definite inertia matrix $\bm{M}(\bm{\theta})$ which includes hydrodynamic added mass, the Coriolis-centripetal matrix $\bm{C}(\bm{\theta},\bm{\zeta})$, which also includes added mass effects, the damping matrix $\bm{D}(\bm{\theta},\bm{\zeta})$, the restoring forces $\bm{g}(\bm{\xi})$, and the control forces and moments $\bm{\tau}$. These equations also hold for terrestrial and space VMSs if the hydrodynamic effects are excluded.%, and in this case the matrix $\bm{D}$ will contain friction effects.
+
+Generally, the dynamics of a UVMS are very hard to model. This is mainly due to the effects of added inertia and hydrodynamic drag forces that are experienced underwater. These directly affect $\bm{M}$, $\bm{C}$, and $\bm{D}$. Additionally, its hydrostatics, collected in $\bm{g}$, may not be perfectly known, particularly if the vehicle is often reconfigured. As a result, model-based control of UVMSs loses some of its tractability when only poor estimates of the dynamics are available. Even so, model-based controllers may necessarily perform better than those that do not depend on the dynamic model. Indeed, this is often the case, especially for systems with a large degree of coupling at the dynamic level. Additionally, some effects due to model uncertainties may be alleviated by use of robust feedback control, and this will be investigated in this paper.
+
+\section{Operational Space Control}\label{sec:inverse dynamics}
+In this section, some background theory of OSC is recounted. Then, motivated by \cite{Dilillo2021}, we derive the task-level dynamics of a UVMS subjected to dynamic model errors in the task-priority OSC. An analysis of the dynamics is then performed, and this reveals that errors in the system inertia estimate may cause an algebraic loop to appear.
+%create an algebraic loop which makes the system very hard to control. % Burde dette være i kap. 4?
+\subsection{Background}\label{subsec:OSC background}
+Generally, OSC is a control approach where a system is controlled in the coordinates of some task, such as the end-effector coordinates of a robot manipulator. In task-priority OSC, we can define $r$ tasks in a prioritized order. Tasks can be defined as any function of the system states, and several prioritized tasks form a hierarchy of tasks. The main idea behind the hierarchy is that tasks with higher priority will not be affected by motions generated by lower priority tasks. Let $\bm{x}_i(t) \in \mathbb{R}^{m_i}$ denote an $m_i$-dimensional task, with $i \in \left\{1, \dots, r\right\}$. The task coordinates are related to the system configuration through the kinematic relationship
+\begin{equation}\label{eq:task kinematics}
+    \bm{x}_i(t) = \bm{f}_i{\left(\bm{\xi}(t)\right)},
+\end{equation}
+where $\bm{f}_i$ generally is a nonlinear function. The differential task kinematics are found through time differentiation of \eqref{eq:task kinematics} and insertion of \eqref{subeq:kinematics} as
+\begin{equation}\label{eq:diff kinematics}
+    \dot{\bm{x}}_i(t) = \dfrac{\partial \bm{f}_i{\left( \bm{\xi}(t)\right)}}{\partial \bm{\xi}} \dot{\bm{\xi}} = \bar{\bm{J}}_i{\left(\bm{\xi}\right)} \dot{\bm{\xi}}(t)  = \bm{J}_i{\left(\bm{\xi}(t)\right)}\bm{\zeta}(t),
+\end{equation}
+where $\bm{J}_i{\left(\bm{\xi}\right)} \triangleq \bar{\bm{J}}_i{\left(\bm{\xi}\right)} \bm{J}_{\bm{\xi}}{\left(\bm{q}\right)} \in \mathbb{R}^{m_i \times (6+n)}$.
+Furthermore, omitting dependencies for readability, the task acceleration is given by
+\begin{equation}
+    \begin{aligned}
+        \ddot{\bm{x}}_i &= \bm{J}_i \dot{\bm{\zeta}} + \dot{\bm{J}}_i \bm{\zeta} \\
+        &= \bm{J}_i\bm{M}^{-1}(\bm{\tau}
+        - \bm{C}\bm{\zeta}
+        - \bm{D}\bm{\zeta}
+        - \bm{g}) + \dot{\bm{J}}_i \bm{\zeta}.
+    \end{aligned}
+\end{equation}
+Then, by collecting dynamic terms as
+\begin{equation}
+    \label{eq:cdg}
+    \bm{n} = \bm{C}\bm{\zeta}
+    + \bm{D}\bm{\zeta}
+    + \bm{g},
+\end{equation}
+and defining the task inertia (assuming $\bm{J}_i$ has full rank)
+\begin{equation}
+    \label{eq:task_inertia}
+    \bm{\Lambda}_i = (\bm{J}_i\bm{M}^{-1}\bm{J}_i^T)^{-1} \in \mathbb{R}^{m_i \times m_i},
+\end{equation}
+we may express the dynamics of the task by
+\begin{equation}
+    \label{eq:task_dynamics}
+    \bm{\Lambda}_i\ddot{\bm{x}}_i =
+    \bm{\Lambda}_i\bm{J}_i \bm{M}^{-1}( \bm{\tau}
+    - \bm{n}) + \bm{\Lambda}_i\dot{\bm{J}}_i \bm{\zeta}.
+\end{equation}
+Systems that are redundant with respect to some task $\bm{x}_i$ are generally able to complete other tasks by projecting control forces and moments into the null space of that task. The dynamically consistent null space projectors associated with each task is given by \citep{Khatib2004}
+\begin{equation}
+    \label{eq:nullspace_projector}
+    \bm{N}_1 = \bm{I}_{n+6}, \quad
+        \bm{N}_{i+1} = \left(\bm{I}_{n+6} - \bm{N}_i\bm{J}^T_i (\bm{J}^{\dagger}_i)^T\right)\bm{N}_i,
+\end{equation}
+\iffalse
+Sparer litt plass på å samle dette på en linje
+\begin{equation}
+    \begin{aligned}
+        \bm{N}_1 &= \bm{I}_{n+6}, \\
+        \bm{N}_{i+1} &= \left(\bm{I}_{n+6} - \bm{N}_i\bm{J}^T_i (\bm{J}^{\dagger}_i)^T\right)\bm{N}_i,
+    \end{aligned}
+\end{equation}
+\fi
+where
+\begin{equation}
+    \label{eq:J_inv}
+    \bm{J}_i^{\dagger} = \bm{M}^{-1}\bm{J}_i^T\bm{\Lambda}_i
+\end{equation}
+is the inertia-weighted pseudoinverse of $\bm{J}_i$. Using the null space projectors, it is possible to define the prioritized task inertia \citep{Khatib2004} as
+\begin{equation}
+    \label{eq:prioritized task inertia}
+    \bm{\Lambda}_i = (\bm{J}_i\bm{N}_i^T\bm{M}^{-1}\bm{N}_i\bm{J}_i^T)^{-1} = (\bm{J}_i\bm{M}^{-1}\bm{N}_i\bm{J}_i^T)^{-1},
+\end{equation}
+given that $\bm{N}_i\bm{J}_i^T$ has full rank (i.e. that the task is kinematically compatible with higher priority tasks). If the converse is true, $(\bm{J}_i\bm{M}^{-1}\bm{N}_i\bm{J}_i^T)$ will be singular. Eigenvalue decomposition of $(\bm{J}_i\bm{M}^{-1}\bm{N}_i\bm{J}_i^T)$ reveals the null space controllable dimensions of the task \citep{Khatib2004}.
+\begin{remark}
+    Henceforth, $m_i$ is considered to be equal to the number of controllable dimensions in the task.
+\end{remark}
+For a system with $r$ tasks, the control input is chosen as
+\begin{equation}
+    \label{eq:total control input}
+    \bm{\tau} = \bm{N}_1\bm{\tau}_1 + \bm{N}_2 \bm{\tau}_2 + ... + \bm{N}_r \bm{\tau}_r + \bm{n} = \sum_{i=1}^r \bm{N}_i\bm{\tau}_i + \bm{n},
+\end{equation}
+where $\bm{\tau}_1, \bm{\tau}_2,...,\bm{\tau}_r$ are control inputs corresponding to the $r$ different tasks while the nonlinear dynamics \eqref{eq:cdg} are cancelled directly. The task-level control inputs are chosen such that they linearize the task dynamics, i.e.
+\begin{align}
+\label{eq:contr_single_task}
+\bm{\tau}_i =
+    \bm{J}_i^T\bm{\Lambda}_i\bigg(\bm{a}_i - \dot{\bm{J}}_i\bm{\zeta} - \bm{J}_i \bm{M}^{-1}\sum_{j=1}^{i-1}\bm{N}_j \bm{\tau}_j\bigg),
+\end{align}
+where $\bm{a}_i$ is the desired task acceleration to be defined later.
+\begin{remark}
+    The sum in \eqref{eq:contr_single_task} is by definition zero for $i=1$.
+\end{remark}
+The dynamically consistent null space projectors satisfy
+\begin{equation}
+    \label{eq:no bottom up}
+    \bm{J}_i \bm{M}^{-1} \bm{N}_j = \bm{0}, \ i<j,
+\end{equation}
+that is, they remove any effects from $\bm{\tau}_i$ on the higher prioritized tasks. Null space projectors constructed without using the inertia weighted Jacobian inverse in \eqref{eq:J_inv} will still be kinematically consistent. That is, they satisfy
+\begin{equation}
+    \label{eq:kinematic_consistency}
+    \bm{J}_i \bm{N}_j = \bm{0}, \ i<j,
+\end{equation}
+but may not be dynamically consistent and thus a coupling between tasks will remain at the dynamic level. The closed-loop task-level dynamics are found by insertion of \eqref{eq:total control input} and \eqref{eq:contr_single_task} into \eqref{eq:task_dynamics} such that
+\begin{flalign}
+    \label[]{eq:task_dynamics_no_err}
+    \ddot{\bm{x}}_i &= \bm{J}_i\bm{M}^{-1}\bm{N}_i\bm{J}_i^T\bm{\Lambda}_i\bigg(\bm{a}_i - \dot{\bm{J}}_i\bm{\zeta} - \bm{J}_i\bm{M}^{-1}\sum_{j=1}^{i-1} \bm{N}_j \bm{\tau}_j\bigg) \notag \\[-10pt] % Dette flytter neste linje litt lenger opp for å spare plass, siden de uanett ikke overlapper
+    &+\bm{J}_i\bm{M}^{-1}\hspace{-.5mm} \sum_{j=1, j\neq i}^r\bm{N}_j \bm{\tau}_j + \dot{\bm{J}}_i\bm{\zeta} \\[-6pt]
+    &= \bm{a}_i \notag &&
+\end{flalign}
+where \eqref{eq:no bottom up} and $\bm{J}_i\bm{M}^{-1}\bm{N}_i\bm{J}_i^T\bm{\Lambda}_i = \bm{I}$ have been applied. It can be observed that the closed-loop dynamics are linear as long as the system model is perfectly known.
+
+%\todo[inline]{There will be coupling between tasks if external forces are present. Can theoretically be cancelled if measured or estimated, which should be possible for interaction forces in the ee, but maybe difficult for currents and other effects. Either mention were assuming no external forces, or add in as a disturbance term}
+
+% In general, it is desirable to control the joint velocities of kinematically redundant robots in the null space of higher-prioritized tasks. This will help to avoid undesirable behavior and instabilities \citep{Hsu1988}. This is reflected in the choice of tasks in the simulation study.
+% Denne er halvveis umotivert eller?
+
+%Depending on the chosen task and system configuration, there may be singularities in the Jacobians leading to uncontrollable task dimensions. Uncontrollable dimensions free up additional degrees of freedom (DoF) for the lower priority tasks \citep{dietrich2018}. This has several implications, one of which is that tasks should be defined so that all available DoF are always utilized and thus avoiding unstable zero dynamics. Additionally, tasks becoming singular may lead to discontinuity in the control signal as the controllable dimensions switch.
+\subsection{Effects of modelling errors}
+\label{sec:model_err}
+So far it has been assumed that terms in the system dynamics can be perfectly cancelled by the control law. A mathematical model of a real system, however, will inevitably contain parameter uncertainties \citep{Nakanishi2008}. Analysis of the effects of modelling errors has already been done by \cite{Antonelli2018a, Dilillo2021}. With this section, we intend to extend their analysis. We derive the disturbance term in an explicit form and examine effects of modelling errors both up and down the task hierarchy. In the presence of model errors, it is reasonable to rewrite \eqref{eq:contr_single_task} to task-level control inputs in the form
+% \begin{equation}
+%     \label{eq:control_model_err}
+%     \bm{\tau} = \sum_{i=1}^r \hat{\bm{N}}_{i}\bm{J}_i^T\hat{\bm{\Lambda}}_i \bigg( \bm{a}_i - \dot{\bm{J}}_i\bm{\zeta} - \bm{J}_i \hat{\bm{M}}^{-1}\sum_{j=1}^{i-1}\hat{\bm{N}}_j \bm{\tau}_j\bigg) + \hat{\bm{n}},
+% \end{equation}
+\begin{equation}
+    \label{eq:control_model_err}
+    \bm{\tau}_i =
+        \bm{J}_i^T\hat{\bm{\Lambda}}_i\bigg(\bm{a}_i - \dot{\bm{J}}_i\bm{\zeta} - \bm{J}_i \hat{\bm{M}}^{-1}\sum_{j=1}^{i-1}\hat{\bm{N}}_j \bm{\tau}_j\bigg),
+\end{equation}
+where the symbol $\hat{\cdot}$ implies an estimate. Analogously to \cite{Dilillo2021}, we will consider parameter uncertainties in the dynamics, while the system kinematics (such as $\bm{J}_i$) are considered known. The complete control law then takes the form of
+\begin{equation}
+    \begin{aligned}
+    \label{eq:total control input_err}
+    \bm{\tau} &= \sum_{i=1}^r \hat{\bm{N}}_i\bm{\tau}_i + \hat{\bm{n}} \\&=
+    \sum_{i=1}^r \hat{\bm{N}}_{i}\bm{J}_i^T\hat{\bm{\Lambda}}_i \bigg( \bm{a}_i - \dot{\bm{J}}_i\bm{\zeta} - \bm{J}_i \hat{\bm{M}}^{-1}\sum_{j=1}^{i-1}\hat{\bm{N}}_j \bm{\tau}_j\bigg) + \hat{\bm{n}}.
+    \end{aligned}
+\end{equation}
+Inserting \eqref{eq:total control input_err} into \eqref{eq:task_dynamics} gives
+\begin{equation}
+    \ddot{\bm{x}}_i = \bm{J}_i \bm{M}^{-1} \bigg( \sum^{r}_{j=1} \hat{\bm{N}}_j \bm{\tau}_j + \hat{\bm{n}} - \bm{n} \bigg) + \dot{\bm{J}}_i \bm{\zeta}.
+\end{equation}
+We proceed by splitting the control input in three different parts, namely when $j<i$, $j=i$, and $j>i$. This corresponds to control contributions from higher priority tasks, the current task, and lower priority tasks, respectively. The dynamics of the current task then becomes
+\begin{equation}
+    \label{eq:task_dynamics_err_split}
+    \begin{aligned}
+        \ddot{\bm{x}}_i &=
+        \bm{J}_i\bm{M}^{-1} \sum_{j=1}^{i-1}\hat{\bm{N}}_j\bm{\tau}_j \\ &+
+        \bm{J}_i\bm{M}^{-1}\hat{\bm{N}}_i\bm{J}_i^T\hat{\bm{\Lambda}}_i \bigg(\bm{a}_i-\dot{\bm{J}}_i\bm{\zeta}-\bm{J}_i\hat{\bm{M}}^{-1} \sum_{j=1}^{i-1}\hat{\bm{N}}_j\bm{\tau}_j \bigg) \\&+ \bm{J}_i\bm{M}^{-1} \sum_{j=i+1}^{r}\hat{\bm{N}}_j\bm{\tau}_j + \bm{J}_i\bm{M}^{-1}(\hat{\bm{n}}-\bm{n}) + \dot{\bm{J}}_i\bm{\zeta}.
+    \end{aligned}
+\end{equation}
+We have that
+\begin{equation}
+    \label{eq:task inertia tilde}
+    \begin{aligned}
+    \bm{J}_i\bm{M}^{-1}\hat{\bm{N}}_i\bm{J}_i^T\hat{\bm{\Lambda}}_i
+     \triangleq (\bm{\Lambda}_{i|\widehat{i-1}})^{-1} \hat{\bm{\Lambda}}_i \triangleq \tilde{\bm{\Lambda}}_i,
+    \end{aligned}
+\end{equation}
+where $(\bm{\Lambda}_{i|\widehat{i-1}})^{-1}$ is an inverse task inertia based on the true system inertia. It is projected into an estimate of the dynamically consistent null space by $\hat{\bm{N}}_i$. By collecting terms and using definition \eqref{eq:task inertia tilde} we then obtain
+\begin{equation}\label{eq:CL model errors}
+    \begin{aligned}
+    \ddot{\bm{x}}_i &= \tilde{\bm{\Lambda}}_i \bm{a}_i + \left(\bm{I}-\tilde{\bm{\Lambda}}_i\right) \dot{\bm{J}}_i\bm{\zeta} + \bm{J}_i\bm{M}^{-1}\tilde{\bm{n}} \\&+ \left(\bm{J}_i\bm{M}^{-1} - \tilde{\bm{\Lambda}}_i \bm{J}_i\hat{\bm{M}}^{-1}\right)\sum_{j=1}^{i-1}\hat{\bm{N}}_j\bm{\tau}_j \\&+ \bm{J}_i\bm{M}^{-1}\sum_{j=i+1}^{r}\hat{\bm{N}}_j\bm{\tau}_j \\&\triangleq \tilde{\bm{\Lambda}}_i\bm{a}_i + \bm{d}_i(t, \bm{\xi}, \bm{\zeta}, \bm{\tau}),
+    \end{aligned}
+\end{equation}
+% \begin{equation}
+%     \label{eq:estimated task dynamics}
+%     \begin{aligned}
+%         \ddot{\bm{x}}_i &=
+%         \tilde{\bm{\Lambda}}_i\bm{a}_i
+%         + (\bm{I} - \tilde{\bm{\Lambda}}_i)\dot{\bm{J}}_i\bm{\zeta}
+%         + \bm{J}_i \bm{M}^{-1}\tilde{\bm{n}}  \\
+%         &+ \bm{J}_i \bigg( \bm{M}^{-1}
+%         \sum_{j=1}^{i-1} \hat{\bm{N}}_{j}\bm{\tau}_j + \tilde{\bm{M}}^{-1}\sum_{j=i+1}^{r} \hat{\bm{N}}_{j}\bm{\tau}_j\bigg)
+%          \\
+%         &\triangleq \tilde{\bm{\Lambda}}_i\bm{a}_i + \bm{d}_i(t, \bm{\xi}, \bm{\zeta}, \bm{\tau}),
+%     \end{aligned}
+% \end{equation}
+which describes the closed-loop task-level dynamics in the presence of modelling errors. Firstly, \eqref{eq:CL model errors} has an uncertain input matrix $\tilde{\bm{\Lambda}}_i$. Several disturbances, collected in $\bm{d}_i$, affect the dynamics of each task. These include imperfect cancellation of the joint-space dynamics $\bm{n}$ defined in \eqref{eq:cdg}, the Coriolis term $\dot{\bm{J}}_i\bm{\zeta}$, and both \emph{top-down} and \emph{bottom-up} disturbances. The last two are caused by coupled task dynamics. Task controls from different tasks may thus propagate both up and down the task levels. The partially compensated top-down disturbances \\ $\left(\bm{J}_i\bm{M}^{-1} - \tilde{\bm{\Lambda}}_i \bm{J}_i\hat{\bm{M}}^{-1}\right)\sum_{j=1}^{i-1}\hat{\bm{N}}_j\bm{\tau}_j$ appear since they can not be compensated exactly by \eqref{eq:control_model_err}. The bottom-up disturbances $ \bm{J}_i\bm{M}^{-1} \sum_{j=i+1}^{r} \hat{\bm{N}}_{j}\bm{\tau}_j$ are generated by lower-prioritized tasks on tasks with higher priorities due to the fact that, when the correct inertia matrix is not used, the null space projectors are no longer dynamically consistent. That is, \eqref{eq:no bottom up} does not hold, and the tasks affect each other at the dynamic level. Thus, all task-level control inputs may affect all tasks as illustrated in Fig. \ref{fig:task connection}. This \emph{coupling in control inputs}, may lead to an algebraic loop, where the task-level control input becomes part of the task-level disturbance term $\bm{d}_i$. The consequences of this will be further analyzed in Section \ref{sec:analysis with model err}.
+%For the ideal case, where dynamics are perfectly cancelled, the tasks are completely decoupled. However, the uncertain cancellation of dynamic effects cause a fully connected cascade of tasks, where the control input on each task level also affects all other tasks.
+
+%Eventuelt d_bottom_up =
+
+\begin{figure}
+    \centering
+    \includegraphics[width=1\linewidth]{figures/IFAC23/task_interconnection_vert.pdf}
+    \caption{Conceptual overview of connections between tasks}
+    \label{fig:task connection}
+\end{figure}
+
+% Equivalently to the formulation in \cite{Dilillo2021}, the task dynamics can be calculated by inserting \eqref{eq:control_model_err} into \eqref{eq:vms_motion_eqs} and premultyplying with $(\hat{\bm{J}}_i^{\dagger})^T$
+% \begin{align}
+%     \label{eq:task_dynamics_dilillo}
+%     (\hat{\bm{J}}_1^{\dagger})^T \bm{M} \dot{\bm{\zeta}} &= (\hat{\bm{J}}_1^{\dagger})^T \bm{J}_1^T\hat{\bm{M}}_1
+%     (\bm{a}_1 - \dot{\bm{J}}_1\bm{\zeta}) \\
+%     &+ (\hat{\bm{J}}_1^{\dagger})^T \bm{\tilde{n}}
+%     + (\hat{\bm{J}}_1^{\dagger})^T \sum_{i=2}^r\bm{N}_{i-1}\bm{\tau}_i
+% \end{align}
+% Utilizing the fact that $(\hat{\bm{J}}_1^{\dagger})^T \bm{J}_1^T = \bm{I}$, which also leads to $(\hat{\bm{J}}_1^{\dagger})^T \hat{\bm{N}}_1 = \bm{0},$ and following equations (28)-(29) in \cite{Dilillo2021} eventually gives
+% \todo[inline]{Usikker på hvor mye mellomregning som skal med her, veldig lite intuitivt ihvertfall}
+% \begin{equation}
+%     \begin{aligned}
+%     \ddot{\bm{x}}_1 &= \bm{a}_1
+%     + \bm{J}_1 (\bm{I} - \hat{\bm{M}}^{-1} \bm{M}) \dot{\bm{\zeta}}
+%      + \hat{\bm{M}}^{-1}_1 (\hat{\bm{J}}_1^{\dagger})^T \tilde{\bm{n}} \\
+%      &= \bm{a}_1 + \bm{\phi}(\bm{\theta}, \bm{\zeta}, \dot{\bm{\zeta}})
+%     \end{aligned}
+% \end{equation}
+% \todo[inline]{Looks like both this and \eqref{eq:task_dynamics_model_err} are correct, with the superugly acceleration dependant disturbance term accounting for how different they look}
+
+\subsection{Task-level control}
+\label{sec:task_level_ctrl}
+
+A typical choice for the desired task acceleration is
+\begin{equation}
+    \label{eq:task_level_PD}
+    \bm{a}_i = \ddot{\bm{x}}_i^d - \bm{K}_{D,i} \dot{\tilde{\bm{x}}}_i - \bm{K}_{P,i} \tilde{\bm{x}}_i
+ \end{equation}
+which is a proportional-derivative (PD) controller with a task acceleration feedforward term $\ddot{\bm{x}}_i^d$. The task error is defined as $\tilde{\bm{x}}_i \triangleq \bm{x}_i-\bm{x}_{i}^d$, where $\bm{x}_{i}^d$ is the desired task trajectory. The gains $\bm{K}_{P,i}$ and $\bm{K}_{D,i}$ are positive definite matrices. Without any modelling errors, the dynamics of the task tracking error are linear with an exponentially stable (ES) equilibrium.
+% \begin{equation}
+%     \label{eq:task_1_PD_dynamics_no_err}
+%     \ddot{\tilde{\bm{x}}}_i + \bm{K}_{D, i}\dot{\tilde{\bm{x}}}_i +  \bm{K}_{P, i}\tilde{\bm{x}}_i = \bm{0}.
+% \end{equation}
+The presence of modelling errors, however, complicates the task dynamics significantly as seen in \eqref{eq:CL model errors}.
+
+In order to compensate for this, we consider a control law with stronger robustness properties than \eqref{eq:control_model_err}, \eqref{eq:task_level_PD}. SMC is known to be able to handle uncertain input coefficients and time- and state-dependent perturbations. Traditional first-order sliding mode requires knowledge of the upper bound of the disturbances and is highly prone to chattering. For these reasons, we will instead use the generalized STA (GSTA), which can theoretically compensate for unbounded disturbances and has a continuous control input.
+
+In the scalar case, the GSTA control approach is described by the differential equation \citep{Moreno2009}
+\begin{equation}
+    \begin{aligned}
+        \label{eq:u_STA}
+        u_\mathrm{GSTA} &= -\alpha\phi_1(\sigma) + v,
+        &\dot{v} = -\beta\phi_2(\sigma),
+    \end{aligned}
+\end{equation}
+where
+\begin{subequations}
+    %\setlength{\abovedisplayskip}{-2pt}
+    \begin{align}
+        \phi_1 (\sigma) &= \absign{\sigma}^{\frac{1}{2}} + L \sigma, \\
+        \phi_2 (\sigma) &= \frac{1}{2}\absign{\sigma}^0 + \frac{3}{2}L\absign{\sigma}^{\frac{1}{2}} + L^2\sigma,
+    \end{align}
+\end{subequations}
+%The conventional STA \citep{Levant1993} is recovered when $L=0$.
+and $\absign{a}^b \triangleq |a|^b\sgn(a)$. The control law has three gains $\alpha,\beta, L \in \mathbb{R}$, and uses a \emph{sliding variable} $\sigma \in \mathbb{R}$, to be designed. The applied control signal is continuous due to the integration of the sign term in \eqref{eq:u_STA} ($u_{\text{GSTA}} \in \mathcal{C}^0$). We choose the task-level sliding variable as
+\begin{equation}
+    \label{eq:sigma_def}
+    \bm{\sigma}_i(\bm{x}) = \dot{\tilde{\bm{x}}}_i + \bm{\Omega}_{i}\tilde{\bm{x}}_i,
+\end{equation}
+with $\bm{\Omega}_i \succ \bm{0}$. This choice is made so that on the surface $\bm{S} \triangleq \{\bm{x} : \bm{\sigma}_i(\bm{x}) = \bm{0}\}$ in the state space, the task dynamics become
+\begin{equation}
+    \label{eq:task_dyamics_sliding}
+    \dot{\tilde{\bm{x}}}_i = - \bm{\Omega}_i \tilde{\bm{x}}_i
+\end{equation}
+and converge exponentially to the equilibrium $\tilde{\bm{x}}_i = \bm{0}$. The scalar control law \eqref{eq:u_STA} can be applied independently on each degree of freedom (DoF) of a task by defining
+\begin{equation}
+    \label{eq:a_STA}
+    \bm{a}_i = -\bm{A}_{i} \bm{\phi}_1(\bm{\sigma}_i) + \bm{v}_i + \ddot{\bm{x}}^r_i
+    \quad \dot{\bm{v}}_i = -\bm{B}_{i}\bm{\phi}_2(\bm{\sigma}_i),
+\end{equation}
+where $\bm{A}_{i}$ and $\bm{B}_{i}$ are diagonal gain matrices, $\ddot{\bm{x}}^r = \ddot{\bm{x}}_i^d - \bm{\Omega}_i\dot{\tilde{\bm{x}}}_i$, and $\bm{\phi}_{1}(\bm{\sigma}_i)$ and $\bm{\phi}_{2}(\bm{\sigma}_i)$ are the functions $\phi_1(\cdot)$ and $\phi_2(\cdot)$ applied element-wise on $\bm{\sigma}_i$, respectively. %\todo[inline]{Kan legge inn referanse (Slotine \& Li feks) på valg av virtuell referanse?}
+% This gives the closed loop dynamics of $\sigma$ as
+% \begin{equation}
+%     \dot{\bm{\sigma}}_i = \ddot{\bm{x}}_i + \bm{\Omega}\dot{\bm{x}}_i = -\bm{A}_{i} \bm{\phi}_1(\bm{\sigma}_i) + \bm{v}_i.
+% \end{equation}
+% which reaches $\bm{0}$ in finite time, after which the origin of the task tracking error is GES.
+\section{Stability analysis}
+\label{sec:stability analysis}
+In this section, we analyze the task dynamics with the PD control law \eqref{eq:task_level_PD} and the STA \eqref{eq:a_STA}, and discuss the properties of the resulting closed-loop system. Some fundamental challenges of controlling the system in the presence of modelling errors are discussed.
+\begin{assumption}
+    A set of $r$ tasks are considered, such that the total number of controllable task dimensions is equal to the number of DoFs of the system. Additionally, it is assumed that the trajectories of the system stay away from any singularities.
+\end{assumption}
+ %Instead, a set of $r$ compatible tasks are considered, with total task dimensions equal to the total number of DoFs of the system. Such a set of tasks can be found by choosing the controllable dimensions of a set of incompatible tasks.
+\subsection{Without modelling errors}
+Without any model errors, the task dynamics are described by \eqref{eq:task_dynamics_no_err}. This means that all tasks are completely decoupled, implying that any control stabilizing each task also stabilizes the whole system. Furthermore, the DoFs within each task are decoupled, so that each dimension can be controlled independently. The control problem thus simplifies to stabilizing scalar, linear systems of the form
+\begin{equation}
+    \label{eq:x_ij no err}
+    \ddot{x}_{ij} = a_{ij},
+\end{equation}
+where $j \in \left\{1,\dots,m_i\right\}$ denotes a dimension in task $\bm{x}_i$.
+As mentioned, using the PD control law \eqref{eq:task_level_PD} gives a linear closed-loop system with an ES origin. Similarly, it is well known that applying the STA control law \eqref{eq:u_STA} to \eqref{eq:x_ij no err} makes $\sigma_{ij}$ go to zero in finite time, after which the origin $x_{ij}=0$ is ES \citep{Moreno2009}.
+\begin{remark}
+    As the task dynamics \eqref{eq:task_dynamics_no_err} depend on the total system configuration, global results cannot be obtained, due to potential kinematic singularities.
+\end{remark}
+% Applying the control law \eqref{eq:a_STA}, the closed loop dynamics of $\bm{\sigma}_i$ become
+% \begin{equation}
+%     \label{eq:task_CL_STA}
+%     \begin{aligned}
+%         \dot{\bm{\sigma}}_i &= \ddot{\tilde{\bm{x}}}_i + \bm{\Omega}_i\dot{\tilde{\bm{x}}}_i
+%         = -\bm{A}_{i} \bm{\phi}_{1,i}(\bm{\sigma}_i) + \bm{v}_i.
+%     \end{aligned}
+% \end{equation}
+% Since the gain matrices are chosen diagonal, this can be seen as $\check{m}_i$ independent single input-single output (SISO) systems of the form \eqref{eq:u_STA}. This system is known to be globally finite-time stable (FTS) \citep{Moreno2009}.
+% \begin{thm}
+%     \label{thm:Stability certain}
+%     The system \eqref{eq:task_dynamics_no_err}, with control law \eqref{eq:a_STA} will reach the sliding manifold $\bm{S}$ in finite time, after which the origin $(\dot{\tilde{\bm{x}}}_i, \tilde{\bm{x}}_i) = (\bm{0}, \bm{0}) $ of the tracking error is exponentially stable. The origin of each task with perfect model knowledge is therefore uniformly asymptotically stable (UAS).
+% \end{thm}
+% \begin{pf}
+%     Since the task dynamics consists of independent scalar systems, each of which reaches $\sigma_{ij} = 0$ in finite time, the total task will reach $\bm{S}$ in finite time with a settling time equal to the largest settling time of each individual scalar system. Since the task error dynamics $\dot{\tilde{\bm{x}}}_i = \bm{\sigma}_i - \bm{\Omega}_i\tilde{\bm{x}}_i$ is input to state stable with $\sigma$ as input, the origin of the task tracking error is asymptotically stable.
+% \end{pf}
+% \begin{remark}
+%     Note that while these equations imply global stability properties, their structure is dependent on the total configuration of the system as seen in \eqref{eq:task_dynamics}. If the system reaches a singular configuration or if tasks become incompatible, \eqref{eq:task_CL_STA} is no longer valid, and therefore global stability properties can not be deduced.
+% \end{remark}
+% \begin{cor}
+%     Additionally, since all the tasks are completely decoupled in \eqref{eq:task_dynamics_no_err}, the stability of each task can be considered independently. Since each task is UAS, the origin of the total system is also UAS.
+% \end{cor}
+\subsection{With modelling errors}
+\label{sec:analysis with model err}
+Applying the PD control law \eqref{eq:task_level_PD} to the system with modeling errors \eqref{eq:CL model errors} yields the closed-loop task dynamics
+\begin{equation}
+    \label{eq:closed loop PD}
+    \ddot{\tilde{\bm{x}}}_i
+    +\tilde{\bm{\Lambda}}_i (
+    \bm{K}_{D,i}\dot{\tilde{\bm{x}}}_i
+    + \bm{K}_{P.i}\tilde{\bm{x}}_i)
+    = \bm{d}_i + (\tilde{\bm{\Lambda}}_i - \bm{I})\ddot{\bm{x}}_i^d.
+\end{equation}
+When the system dynamics are imperfectly cancelled, the dimensions of each task are no longer decoupled, as discussed in Section \ref{sec:model_err}. It has been demonstrated previously \citep{Borlaug2022} that the GSTA \eqref{eq:a_STA} performs well in spite of this. Differentiating \eqref{eq:sigma_def} with respect to time and inserting \eqref{eq:CL model errors} with control law \eqref{eq:a_STA} yields the dynamics of the sliding variable as
+\begin{align}
+    \dot{\bm{\sigma}}_i &= \ddot{\tilde{\bm{x}}}_i + \bm{\Omega}\dot{\tilde{x}} \notag\\
+    &= \tilde{\bm{\Lambda}}_i
+    \big(-\bm{A}_{i} \bm{\phi}_1(\bm{\sigma}_i) + \bm{v}_i + \ddot{\bm{x}}^r_i \big)
+    + \bm{d}_i - \ddot{\bm{x}}_i^r \notag \\
+    &= \tilde{\bm{\Lambda}}_i
+    \big(-\bm{A}_{i} \bm{\phi}_1(\bm{\sigma}_i) + \bm{v}_i \big)
+    + (\tilde{\bm{\Lambda}}_i - \bm{I})\ddot{\bm{x}}_i^r + \bm{d}_i.
+\end{align}
+This can be seen as $m_i$ coupled scalar systems, given by
+\begin{equation}
+    \label{eq:sigma dynamics uncertain}
+        \dot{\sigma}_{ij} = \tilde{\lambda}_{ij}u_{\mathrm{GSTA}, ij} + \ddot{x}_{ij}^r(\tilde{\lambda}_{ij} - 1) + d_{ij} + c_{ij},
+\end{equation}
+where $\tilde{\lambda}_{ij}$ is the $j$-th diagonal element of $\tilde{\bm{\Lambda}}_i$, $d_{ij}$ the $j$-th element of $\bm{d}_i$, $a_{ij}$ the $j$-th element of $\bm{a}_i$, and $c_{ij}$ contains all coupling terms from the remaining task dimensions. That is, $c_{ij}$ will contain off-diagonal elements in $\tilde{\bm{\Lambda}}_i$, $\bm{d}_i$, and so on.
+
+An obvious issue arises if the inertia matrix $\tilde{\bm{\Lambda}}_i$ is completely unknown. In general, assumptions must be made about the properties of this matrix in order to apply our proposed control laws. An additional problem caused by incorrect knowledge of $\bm{M}$, is the coupling between control inputs across tasks, cf. Fig. \ref{fig:task connection}. To examine the effects of this coupling, we consider what happens at any point where $\ddot{\tilde{\bm{x}}}_i = \bm{0}$. At such a point, the task-level control would have to match the disturbance $\bm{d}_i$ in order to keep perfect tracking, that is
+\begin{align}
+    \bm{0} &= \ddot{\bm{x}}_i - \ddot{\bm{x}}_i^d\\
+    &= \tilde{\bm{\Lambda}}_i \bm{a}_i + \bm{d}_i - \ddot{\bm{x}}_i^d \\
+    \implies \bm{a}_i &= \tilde{\bm{\Lambda}}_i^{-1}\ddot{\bm{x}}_i^d - \tilde{\bm{\Lambda}}_i^{-1} \bm{d}_i
+\end{align}
+which can be written more explicitly as
+\begin{equation}
+    \begin{aligned}
+        \bm{a}_i &= \tilde{\bm{\Lambda}}_i^{-1}\ddot{\bm{x}}_i^d
+        - (\tilde{\bm{\Lambda}}_i^{-1} - \bm{I})\dot{\bm{J}}_i \bm{\zeta}
+        + \tilde{\bm{\Lambda}}_i^{-1}\bm{J}_i\bm{M}^{-1}\tilde{\bm{n}} \\
+        &+ \left(\tilde{\bm{\Lambda}}_i^{-1}\bm{J}_i\bm{M}^{-1} - \bm{J}_i\hat{\bm{M}}^{-1}\right)\sum_{j=1}^{i-1}\hat{\bm{N}}_j\bm{\tau}_j \\
+        &+ \tilde{\bm{\Lambda}}_i^{-1}\bm{J}_i
+        \hat{\bm{M}}^{-1}\sum_{j=i+1}^{r}\hat{\bm{N}}_j\bm{\tau}_j,
+    \end{aligned}
+\end{equation}
+% the PD control law. Since $\bm{d}_i$ is in general nonvanishing, a PD controller cannot compensate for it completely. In order to investigate its effects, we analyze what would happen if the system reached an equilibrium where $\ddot{\tilde{\bm{x}}}_i = \dot{\tilde{\bm{x}}}_i = \bm{0}$. Then, \eqref{eq:closed loop PD} becomes $\tilde{\bm{\Lambda}}_i\bm{K}_{P,i}\tilde{\bm{x}}_i = \bm{d}_i + (\bm{I} - \tilde{\bm{\Lambda}}_i)\ddot{\bm{x}}_i^d$. As expected, an equilibrium would imply a tracking error, whose size depends on the disturbance. The problem is made clearer by calculating an expression for $\bm{a}_i$ at such an equilibrium.
+% \begin{equation}
+%     \begin{aligned}
+%         \bm{a}_i &= \ddot{\bm{x}}_i^d - \bm{K}_{P,i}\tilde{\bm{x}}_i \\
+%         &= \tilde{\bm{\Lambda}}_i\ddot{\bm{x}}_i^d
+%         - (\tilde{\bm{\Lambda}}_i^{-1} - \bm{I})\dot{\bm{J}}_i \bm{\zeta}
+%         + \tilde{\bm{\Lambda}}_i^{-1}\bm{J}_i\bm{M}^{-1}\tilde{\bm{n}} \\
+%         &+ \tilde{\bm{\Lambda}}_i^{-1}\bm{J}_i
+%         \bigg(\bm{M}^{-1}\sum_{j=1}^{i-1}\hat{\bm{N}}_j\bm{\tau}_j
+%         + \tilde{\bm{M}}^{-1}\sum_{j=i+1}^{r}\hat{\bm{N}}_j\bm{\tau}_j \bigg),
+%     \end{aligned}
+% \end{equation}
+%, in that all task control inputs need to compensate for all other task-level controls, as visualized in Fig. \ref{fig:task connection}
+where all $\bm{\tau}_j$ are given by \eqref{eq:contr_single_task}. Thus, the task-level control has to cancel both top-down and bottom-up disturbances caused by all other control inputs $\bm{\tau}_j$. Since the same is true for all other task levels, an algebraic loop appears. This holds regardless of which task-level control law is used. The effects of any higher- or lower-priority control $\bm{\tau}_j$ on $\bm{x}_i$ are scaled by $\left(\bm{J}_i\bm{M}^{-1} - \tilde{\bm{\Lambda}}_i \bm{J}_i\hat{\bm{M}}^{-1}\right)$ or $\bm{J}_i\tilde{\bm{M}}^{-1}\hat{\bm{N}}_j$, respectively, both of which vanishes with perfect knowledge of $\bm{M}$. Depending on the accuracy of $\hat{\bm{M}}$, this effect may cause the control input to grow unbounded and render any task-level control law useless. The effects caused by incorrect cancellation of the nonlinear effects $\bm{n}$ are easier to handle, since it is not directly dependent on the other task-level controls.
+%Therefore, it would make intuitive sense that if the model is ``good enough'', then the effect of this problem would be in some sense ``small''. However, since the disturbance term $\bm{d}_i$ also depends on system states and velocities, it may in theory be arbitrarily large.
+%For example, if the estimate of the damping terms is higher than the actual terms, an attempt at cancelling it will add energy into the system, potentially destabilizing it
+ %It was also shown in \cite{Antonelli2018a}, that incorrect cancellation of the restoring forces will affect the prioritization of tasks even at steady state, since it is the only term still present when the system is not moving.
+
+Since the terms in the disturbance $\bm{d}_i$ are generally nonvanishing, a PD controller will not be able to perfectly compensate for them. Therefore, the best possible performance using a PD control law would be to bring the tracking error $\tilde{\bm{x}}_i$ within some bound around $\bm{0}$, with the size of the bound depending on $\bm{d}_i$. The GSTA control law \eqref{eq:a_STA} has stronger robustness properties which should allow it to compensate for the disturbances to a higher degree. Application of GSTA, meanwhile, means that the disturbance term $\bm{d}_i$ becomes non-Lipschitz and even harder to compensate for.  %is however not Lipschitz anymore due to its dependency on the task-level GSTA control, and therefore can't be perfectly compensated by GSTA.
+
+%However, there are two main difficulties applying it to this system. Namely the mentioned algebraic loop, and the fact that the disturbance caused by other tasks is not Lipschitz and thus cant be perfectly compensated by GSTA
+%it is strongly convergent near zero  has strong convergence near zero in addition to a responsive integrator cite moreno can theoretically compensate for unbounded Lipschitz continuous disturbances. In the case where the algebraic loop does not completely undermine any control strategy, the system will still necessarily have large disturbances and unknown structure, which the GSTA approach has shown to handle well previously. %However, disturbance terms depending directly on the control input, as will be the case with an algebraic loop, may not be possible to cancel. If
+%Secondly, the GSTA control law is not Lipschitz, and disturbances caused by it therefore can not be exactly compensated using GSTA. Practically, if two tasks are interconnected such that both their integral states are growing to cancel each other, the system may quickly reach the physical limits of its actuators.
+%The issues mentioned in this section prohibit making any conclusions on the system stability properties without making severely limiting assumptions. However, as shown in Section \ref{sec:sim}, and in countless earlier physical implementations of inverse dynamics on various systems it will often perform well in practice.
+
+The challenges detailed in this section prevent us from reaching any definite conclusions on the stability properties of the system \eqref{eq:CL model errors} with the control law \eqref{eq:task_level_PD} or \eqref{eq:a_STA} without making inelegant assumptions. However, as will be demonstrated in Section \ref{sec:sim} (and has been shown in a variety of other works), practical implementation of OSC tends to perform fairly well.
+
+\iffalse
+A bound on the derivative of the disturbance term is reasonable when considering mechanical systems, as the physical values in $d$ can not change instantly. One issue with this viewing the system in this way is that the cross terms between tasks may lead to the task control having to cancel the control inputs of other task levels. This may lead to a loop, where all the task inputs grow indefinitely to combat growing the growing task signals in other tasks. The integral term in the STA control law allows potentially unbounded inputs, but this can obviously not be achieved with physical actuators. This loop also breaks the assumptions of \cite{Castillo2018}.
+
+Therefore, for the system to be stable, a bound on the coupling terms must also hold. Based on the numerical simulations in \cref{sec:sim}, this appears to hold even for a system with fairly large model uncertainties.
+
+For the highest priority task, the closed-loop dynamics are given in \eqref{eq:task1_dynamics}. Inserting the PD+ task level control from \eqref{eq:task_level_PD}, we get
+\begin{equation}
+    \label{eq:task1_dyanmics_PD}
+    \ddot{\bm{x}} =
+    \bar{\bm{\Lambda}}_1(\ddot{\bm{x}}_1^d
+    - \bm{K}_{D,i} \dot{\tilde{\bm{x}}}_1
+    - \bm{K}_{P,i} \tilde{\bm{x}}_1)
+    + \bm{d}_1(\bm{\xi}, \bm{\zeta})
+\end{equation}
+
+When applying GSTA, the dynamics of $\bm{\sigma}$ become
+\begin{equation}
+    \begin{aligned}
+    \label{eq:task1_dynamics_STA}
+    \dot{\bm{\sigma}} &=
+    -\bar{\bm{\Lambda}}_1\bm{K}_1(\absign{\bm{\sigma}_1}^{\frac{1}{2}} + \bm{\beta}\bm{\sigma}_1)
+    + \bar{\bm{M}}_1\bm{v}_1 \\
+    &- \ddot{\bm{x}}_d + \bm{\Lambda}_i\tilde{\bm{x}}
+    + \bm{d}_1(\bm{\xi}, \bm{\zeta}).
+    \end{aligned}
+\end{equation}
+
+\textbf{Lyapunov }
+Define $\bm{\mu}_i = [\phi_1(\sigma_i)^T \quad v_i^T]^T$ and use the task level LFC
+\begin{equation}
+    V_i = \bm{\mu}_i^T \bm{P} \bm{\mu}_i
+\end{equation}
+with some constant $\bm{P} = \bm{P}^T > 0$
+
+\begin{equation}
+    \dot{V} = \bm{\mu}_i^T \bm{P} \dot{\bm{\mu}}_i
+\end{equation}
+
+\begin{equation}
+    \dot{\bm{\mu}} = \begin{bmatrix}
+        \frac{\partial \phi(\sigma)}{\partial \bm{\sigma}_i}
+    \end{bmatrix}
+\end{equation}
+\fi
+
+\section{Simulations}
+\label{sec:sim}
+In this section, we investigate the performance of the control law \eqref{eq:total control input}, \eqref{eq:contr_single_task} together with the PD law \eqref{eq:task_level_PD} and the GSTA law \eqref{eq:a_STA}, respectively, through a simulation study. The UVMS used in the simulations is the AIAUV ``Eelume'' \citep{Liljeback2017,schmidt-didlaukies2018} depicted in Fig. \ref{fig:eel}. The simulations were run in Matlab with ODE1 and a fixed step size of 0.01s.
+
+Task-priority control of AIAUVs has been investigated across several works. In \cite{Borlaug2022} and \cite{Iversflaten2022}, inverse kinematics control was applied, and the dynamics were controlled by sliding mode control (SMC). In \cite{Basso2020a}, feedback linearization in a task-priority OSC framework was investigated for and applied to an AIAUV but relied on perfect dynamic model knowledge. Model knowledge was utilized also in \cite{Saebo2022}, where the passivity-based method in \cite{Dietrich2020} was applied to an AIAUV and first-order SMC was adopted at each task level.
+
+Eelume is a modular, slender, and multi-articulated vehicle with no separate base. Due to its many DoFs, redundancy resolution is an important element of AIAUV control. The modularity allows the robot to be easily reconfigured, which affects its weight distribution and balance. Obviously, it is infeasible to derive new model parameters with every configuration change. Correctly modelling this robot for the purpose of simulation is considered ``immensely challenging'' \citep{schmidt-didlaukies2018}. These characteristics make Eelume a prime candidate for the simulation study.
+
+The simulation model of the robot has been derived by perturbing the nominal controller model \eqref{eq:vms_motion_eqs}. The inertia matrix (and consequently the Coriolis matrix \citep{Fossen2011}) has been modified by changing the added mass coefficients in all DoFs. Both linear and nonlinear damping coefficients have been perturbed as well. The nominal and perturbed parameters are shown in Table \ref{tab:param}.
+%Lastly, the centers of gravity (COG) and buoyancy (COB) have been moved in each link to simulate the effects of reconfiguration.
+
+The simulated AIAUV has nine links and $n=8$ joints, yielding a total of $14$ DoFs. Seven thrusters are positioned along the robot. Since Eelume has no separate robot base, both of its ends can be viewed as end-effectors. Therefore, it is logical to attempt to control the configuration of both ends. We choose the ``tail'' (henceforth denoted ``base'' for familiarity) configuration as the highest-prioritized task, and ``head'' (denoted ``end-effector'') as the second. The first task and its error can be expressed as
+\begin{equation}
+    \bm{x}_1 =
+    \begin{bmatrix}
+        \bm{p}^i_{ib} \\
+        \bm{\epsilon}
+    \end{bmatrix},
+    \tilde{\bm{x}}_1 =
+    \begin{bmatrix}
+        \bm{p}^i_{ib} - \bm{p}^i_{ib,d} \\
+        \eta \bm{\epsilon}_d - \eta_d \bm{\epsilon} + S{\left(\bm{\epsilon}\right)} \bm{\epsilon}_d
+    \end{bmatrix},
+\end{equation}
+where $\bm{p}^I_{IB,d}$ and $\bm{q}_d = \left[\eta_d, \bm{\epsilon}_d^T\right]^T$ is the desired base position and attitude, respectively. The vector part of the quaternion is sufficient for attitude representation due to its unit length constraint. Analogously, the end-effector configuration is defined as the second task, $\bm{x}_2$. At most, these two tasks consume $m_1+m_2=6+6=12$ DoFs of the system. To ensure that no DoFs are left uncontrolled, a final task was chosen, which was to keep the joint velocities at zero. In practice, the eigenvalue decomposition detailed in Section \ref{subsec:OSC background} is implemented with a small threshold value $\epsilon_i$ to avoid inversion of arbitrarily small elements. The controller gains were chosen equal for the two main tasks. For the PD controller, they were chosen as $\bm{K}_{P, 1} = \bm{K}_{P, 2} = \mathrm{diag}\left\{0.5, 0.5, 0.5, 1, 1, 1\right\}$ and $\bm{K}_{D, 1} = \bm{K}_{D, 2} = \mathrm{diag}\left\{5, 5, 5, 3, 3, 3\right\}$. The STA proved to perform well with unit gains, so no further tuning was performed, i.e. $\bm{A}_1  = \bm{A}_2 = \bm{B}_1 = \bm{B}_2 = \bm{I}_{6}$, and $L = 1$. The final task only has a damping term, with gain $\bm{K}_{D, 3} = 10\bm{I}_n$. Moreover, the STA control law was implemented with a continuous approximation of the sign term, namely $\mathrm{sgn}(a) \approx \mathrm{tanh}(a/\epsilon)$, where $\epsilon = 0.01$, in order to further attenuate any chattering.
+%If they at any point become incompatible, i.e. that $\bm{N}_2\bm{J}_2^T$ drops rank, some DoF might become redundant. In any case, it is necessary to include a last task that controls the joint velocities in the null space of $\bm{J}_1$ and $\bm{J}_2$ in order to avoid instability \citep{Hsu1988}. Thus, the task hierarchy becomes: base configuration $\rightarrow$ end-effector configuration $\rightarrow$ joint velocities.
+\begin{table}[b]
+    \caption{Dynamic model parameters}
+    \label{tab:param}
+\begin{center}
+\begin{tabular}{|l|c|c|}
+\hline
+    & Nominal & Perturbed \\
+    \hline
+    Added mass coeff. & 1 & 3 \rule{0pt}{2.6ex}\\
+    Nonlinear drag coeff. in surge & 0.2& 0.6\\
+    Nonlinear drag coeff. in roll &0.1& 0.7 \\
+    Nonlinear crossflow drag coeff. &0.5&0.1  \\
+    Linear cross drag coeff. &0.1&0.8  \\
+    Added mass ratio, surge &0.2& 0.5 \\
+    Linear drag parameter, surge &0.1&0.5  \\
+    Linear drag parameter, roll &0.1&0.7  \\
+    \hline
+\end{tabular}
+\end{center}
+\end{table}
+
+We initialized the system in an S-shape (see Fig. \ref{fig:eel}) \\$(\bm{\theta} = \left[0,\dfrac{\pi}{3},0,\dfrac{\pi}{3},0,-\dfrac{\pi}{3},0,-\dfrac{\pi}{3}\right]^T)$, since it yields compatibility between the base and end-effector tasks. The reference trajectories for the base and end-effector configurations are shown in Fig. \ref{fig:references} and chosen such that the tasks eventually cannot be completed simultaneously, i.e. that $m_2<6$. Figs. \ref{fig:base tilde} and \ref{fig:ee tilde} show the tracking error of the base and end-effector tasks both with the PD control law \eqref{eq:task_level_PD} and the GSTA \eqref{eq:a_STA}. It can be seen that the $x$-position and pitch angle of the end-effector become uncontrollable just before $t=40s$. This happens since the end-effector tries to move too far away from the base, such that $\bm{N}_2\bm{J}_2^T$ drops rank. It is clear that the GSTA exhibits superior tracking to the PD controller in the controllable dimensions of both tasks. Lastly, Fig. \ref{fig:tau} shows the control forces and moments generated by both control laws. Notably, the sliding mode control signal in the upper plot oscillates compared to the PD control input. The control signal is however still continuous, and the oscillations are fairly small with a frequency of around $1$ Hz and an amplitude less than $1$ N. Thus the increased robustness compared to the PD controller may be worth the additional chattering depending on the system. %The issue of chattering can be further mitigated through the use of a continuous approximation of the sign term, however this often comes with at the cost of controller performance.
+\begin{remark}
+    The transition that happens as $m_2$ first decreases causes a discontinuity in the control just before $t=40\mathrm{s}$ but is of no significance in the context of this work.
+\end{remark}
+
+
+
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=\linewidth]{figures/IFAC23/Simulation/references.png}
+    \vspace{-5mm}
+  \caption{The desired base and end-effector trajectories}
+  \label{fig:references}
+  % Gledelig AMOS-dag!
+ \end{figure}
+
+ \begin{figure}[t]
+    \centering
+    \includegraphics[width=\linewidth]{figures/IFAC23/Simulation/base_tilde_nyeste.png}
+    \vspace{-5mm}
+  \caption{Comparison of the base configuration errors using PD and STA control}
+  \label{fig:base tilde}
+ \end{figure}
+
+ \begin{figure}[t]
+    \centering
+    \includegraphics[width=\linewidth]{figures/IFAC23/Simulation/ee_tilde_nyeste.png}
+    \vspace{-5mm}
+  \caption{Comparison of the end-effector configuration errors using PD and STA control}
+  \label{fig:ee tilde}
+ \end{figure}
+
+ \begin{figure}[t]
+    \centering
+    \includegraphics[width=\linewidth]{figures/IFAC23/Simulation/tautest.png}
+    \vspace{-5mm}
+  \caption{Control forces and moments in both control laws}
+  \label{fig:tau}
+ \end{figure}
+
+\section{Conclusions and Future Work}\label{sec:IFAC:conclusions}
+In this paper, the task-priority OSC problem was formulated for UVMSs whose dynamic model has parameter uncertainties. The resulting task-level dynamics were analyzed for the case with an arbitrary number of tasks. The analysis revealed that every task level may suffer from an algebraic loop due to the presence of both top-down and bottom-up disturbances. The analysis is applicable also for other VMSs, which can be viewed as special cases of the UVMS model \eqref{eq:vms_motion_eqs}. A simulation study using an AIAUV was conducted which validated the aforementioned analysis. We implemented a task-level GSTA in an attempt to achieve satisfactory tracking in the presence of large errors in the dynamic model parameters. This control approach was compared to a standard PD controller and displayed significantly improved robustness. Future work will focus on experimental validation.
+
+\ifSubfilesClassLoaded{%
+  \bibliographystyle{\chosenbibstyle}
+  \bibliography{\bibfilename}
+}{}
+
+\end{document}

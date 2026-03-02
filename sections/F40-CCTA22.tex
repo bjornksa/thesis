@@ -1,0 +1,827 @@
+\documentclass[../main.tex]{subfiles}
+\begin{document}
+
+\chapter{CCTA}
+
+This chaper is based on \cite{saebo2022}.
+
+Enabling vehicle-manipulator systems to perform complex and precise intervention operations requires a robust control framework capable of handling redundancy and interaction forces. In addition, it is desirable that the method allows completion of several tasks with a strict prioritization to keep safety critical tasks unaffected by other goals. In this paper, a control method is developed for a broad class of vehicle-manipulator systems, with the main use case being floating base underwater vehicle manipulator systems subject to hydrodynamic forces. In underwater applications, large model uncertainties will be present due to hydrodynamic and hydrostatic effects, unknown disturbances and modelling errors. This means that a viable solution must be robust to disturbances and modelling errors, while also satisfying strict task priorities and compliant contact behaviour. To achieve this, a robust impedance based task-priority control method is presented, and its stability and robustness properties are proven. The method is validated in a simulation of an articulated intervention autonomous underwater vehicle (AIAUV).
+
+\section{INTRODUCTION}
+\label{introduction}
+%
+% This introductory chapter will briefly provide context for the material/results presented in this report and give motivation and a description of the problem to be solved. A literature review summarizes existing relevant knowledge, and establishes the foundation of the later control system. The scope of the work is then defined through a list of assumptions. Finally, the contributions of the thesis are defined and elaborated.
+
+The initial motivation for this paper came from the needs of underwater inspection, maintenance, and repair (IMR) tasks. Today, IMR tasks are performed using human divers or remotely operated vehicles (ROVs). ROVs are controlled by human operators, often situated on a supporting surface vessel to which the ROV is tethered. ROV missions are therefore costly, time-consuming, and have large environmental impacts. We have just entered the United Nations' ocean decade, and as the number of subsea operations increases, alternative solutions are required. One alternative is the use of autonomous underwater vehicles (AUVs) which can operate without human supervision. Typical AUVs are torpedo-shaped and designed for survey missions but lack the capability to interact with their environment and standing still in water (hovering). Thus, they can complete some inspection tasks, but not maintenance and repair. In this paper, we want to enable mobile, floating base robots that can not only “fly and see” untethered, but also perform complex tasks with precise manipulator forces. Such robots underwater are named intervention AUVs (I-AUVs), and constitute a subset of vehicle-manipulator systems (VMSs).
+
+VMSs are inherently redundant in regard to the end-effector position, as there will always be the choice between moving the base and moving the manipulator arm to reach a certain configuration. A potential solution must therefore be able to deal with this redundancy. For intervention tasks, limited interaction forces are required to avoid damaging equipment or the vehicle. A much used solution for this is impedance control methods, which aim to control the apparent inertia, damping and stiffness experienced by the environment in interaction with a manipulator. In underwater applications, hydrodynamic and hydrostatic effects introduce significant disturbances and modelling errors. We will target the particular challenging case of underwater vehicle-manipulator systems (UVMSs), with the goal of providing a framework that can be generalized to other VMSs and to redundant fixed-base robot manipulators.
+
+% Krav til løsningen
+% Compliant Interaction behaviour
+% Strict task priorities
+% Robustness
+
+The redundancy of UVMSs allows the completion of several tasks at once, such as moving the end-effector while using redundant degrees of freedom (DoF) to avoid collisions or maintaining an energy efficient configuration. Using task-priority methods is therefore a beneficial way to perform redundancy resolution, and a structured approach to build up autonomous behavior. In safety-critical operations, strict prioritization of tasks is desired, to ensure that the highest prioritized safety related tasks are unaffected by other goals.
+
+Task priority control methods typically use either null space operators \cite{Dietrich2015} or optimization based approaches. Methods with null space operators include task-priority inverse kinematics (IK) \cite{Siciliano1991,Chiaverini1997} and the operational space formulation (OSF) \cite{Khatib1987}. IK does redundancy resolution at the velocity level, building upon the fundamental assumption that the kinematics and dynamics can be decoupled, and hence it is not well suited for UVMSs for which the motion of the arm and the motion of the base are tightly connected. OSF makes the redundancy resolution at the acceleration level. Optimization based techniques such as \cite{Kanoun2011, Bouyarmane2018} allow the inclusion of set-based inequality constraints, but utilizes soft priorities, meaning that the highest prioritized tasks may be disturbed by those with lower priority.
+%  however it is strongly dependent on accurate model knowledge, which will be a problem in underwater systems with large model uncertainties.
+
+Previous work on task priority control of UVMSs include \cite{Antonelli1998} where a task-priority IK approach is applied to allow \emph{two} simultaneous tasks, and \cite{Basso2020} which uses an optimization technique with control Lyapunov functions and control barrier function based QPs. The latter allows strict priority for different groups of tasks, and soft priorities for tasks in the same group. An approach with combined kinematic and dynamic control of UVMSs is proposed in \cite{Borlaug2020a}, where a singularity-robust multiple task-priority framework is combined with a robust sliding mode controller for the dynamics and the stability is proven for the combined control system. The assumption of decoupled kinematics and dynamics is therefore not required. These methods do not allow the specification of interaction behavior required for our use case.
+
+A general framework for impedance control was developed in \cite{Hogan1984}. The idea has been applied for interaction tasks with UVMSs previously, for example in \cite{Dai2020}, where sliding mode impedance control is applied for contact tasks with an I-AUV, and \cite{cieslak2018} which uses adaptive admittance control to achieve contact force tracking. Both of these approaches rely on measurements of the contact force through a sensor in the manipulator. A variant of impedance control where the natural inertia of the system is kept, and contact stiffness and damping can be specified is called compliance control\cite{dietrich2020}. This is easier to tune than impedance control. It is also more robust to modelling errors, which is beneficial for UVMSs due to the uncertainties in hydrodynamic effects.
+
+Compliance control has been combined with task priority frameworks previously, as in \cite{Sadeghian2014} where a framework is developed for fixed base redundant manipulators, that ensures compliant behavior in the null space of the main task. In \cite{Ott2015} a regulation algorithm is developed that dynamically decouples the tasks to allow a strict task priority framework with compliant behavior in the whole task space. This provides a framework with less reliance on accurate model knowledge than OSF, but has the downside of only achieving setpoint regulation, not trajectory tracking. This limitation is removed in \cite{dietrich2020}, but with the new constraint that the task dimension must match the number of DoF of the system. In the more recent \cite{Garofalo2020} and \cite{Garofalo2021}, a control law using a sliding variable is developed that allows both singular tasks, arbitrary large task-dimensions and tracking control. However, the control law is expressed in task velocity coordinates instead of position, giving a less intuitive specification of tasks. Additionally, the tuning of the desired compliance is coupled with the tuning of the sliding parameter. To enable tuning the sliding variable and compliance behavior separately, we base our approach on the work in \cite{dietrich2020}.
+
+In this paper, the control law from \cite{dietrich2020} is extended to the more general class of VMSs and modified to allow compensation of hydrodynamic effects. It is also extended with a sliding variable and sliding mode control to achieve improved convergence properties and robustness with a significantly simpler analysis. The main contributions of the work presented in this paper can thus be summarized as follows: A robust control law for VMSs is developed, which allows utilizing kinematic redundancy for the completion of simultaneous tasks while specifying compliant behavior during interaction. It is developed to address the challenges of floating-base underwater systems, but can also be applied to fixed-base or mobile systems on land. The closed-loop system is proven to be UAS, with ES dynamics for the highest prioritized task, as well as exponentially stable task dynamics for lower priority tasks when all higher priority tasks have converged. Finally, its effectiveness is verified in a simulation study of an AIAUV.
+
+The paper is organized as follows. In Section \ref{sec:modelling}, the mathematical model of a general VMS systems is presented with some specific considerations for UVMS. In Section \ref{sec:prelim}, mathematical background is provided, and the task space is defined. The proposed control law is presented in Section \ref{sec:control_law}, and its stability and robustness properties are proven in Section \ref{sec:stability_proofs}. The control law is then validated through simulations in Section \ref{sec:simulation}. Finally, conclusions and future work are presented in Section \ref{sec:conclusions}.
+
+\section{MATHEMATICAL MODEL}
+\label{sec:modelling}
+We consider general VMSs for which the equations of motion expressed in a body-fixed reference frame are, \cite{From2014}:
+\begin{subequations}
+    \label{eq:UVMS_equation_body}
+    \begin{flalign}
+        \dot{\bm{\xi}} &= \bm{T}_\Theta(\bm{\xi})\bm{\zeta} &&\\
+        \bm{M}(\bm{\theta}) \dot{\bm{\zeta}} +
+        \bm{C}(\bm{\theta}, \bm{\zeta}) \bm{\zeta} &+
+        \bm{D}(\bm{\theta},\bm{\zeta}) \bm{\zeta} +
+        \bm{g}(\bm{\theta}, \bm{\eta})
+        = \bm{\tau} + \bm{\tau}^{\rm ext} && \raisetag{\normalbaselineskip}
+        % Litt shady align-ting men funker?
+    \end{flalign}
+\end{subequations}
+where $\bm{T}_{\Theta}(\bm{\xi})$ is the transformation from body-fixed velocities to the inertial frame, $\bm{M(\bm{\theta})}$ is the inertia matrix, consisting of rigid body inertia and added mass inertia from hydrodynamic effects, $\bm{C}(\bm{\theta}, \bm{\zeta})$ is the centripetal and Coriolis matrix, $\bm{D}(\bm{\theta}, \bm{\zeta})$ is the hydrodynamic damping matrix, $\bm{g}(\bm{\theta},\bm{\eta})$ contains buoyancy and gravitational forces. $\bm{\tau}$ is the vector of applied forces, while $\bm{\tau}^{\rm ext}$ is the vector of external forces affecting the system. For systems on land $\bm{D}(\bm{\theta}, \bm{\zeta})$ is the friction matrix. VMSs are generally described by a base, and one or several manipulators with a total of $n$ joints, where the base and all manipulator links are rigid bodies. The pose and velocities for the system base are given by:
+\begin{equation}
+    \label{eq:eta_nu_def}
+    \bm{\eta}^T = \begin{bmatrix}
+    \bm{p}^T & \bm{\Theta}^T
+    \end{bmatrix} \in \mathbb{R}^{6},
+    \quad
+    \bm{\nu}^T = \begin{bmatrix}
+        \bm{v}^T & \bm{\bm{\omega}}^T
+    \end{bmatrix} \in \mathbb{R}^{6}
+\end{equation}
+with $\bm{p} \in \mathbb{R}^3$ being the position given in an inertial frame, $\bm{\Theta} \in \mathbb{R}^3$ being the rotation parametrized with Euler angles, and $\bm{v}, \bm{\bm{\omega}} \in \mathbb{R}^3$ are the body-fixed linear and angular velocities respectively. The full configuration of a VMS with $n$ links and $n-1$ joints will have $m = 6 + n - 1$ DoFs, and is given by combining \eqref{eq:eta_nu_def} and the joint angles $\bm{\theta} \in \mathbb{R}^{n-1}$:
+%
+\begin{equation}
+    \label{eq:xi_def}
+    \bm{\xi}^T = \begin{bmatrix}
+        \bm{\eta}^T & \bm{\theta}^T
+    \end{bmatrix} \in \mathbb{R}^{m} \quad
+    \bm{\zeta}^T = \begin{bmatrix}
+        \bm{\nu}^T & \dot{\bm{\theta}}^T
+    \end{bmatrix} \in \mathbb{R}^{m}
+\end{equation}
+
+As long as all bodies in the UVMS are symmetric, the model can be parametrized such that it has the following beneficial properties \cite{Antonelli2018}
+\label{sec:model-properties}
+\begin{enumerate}
+    \label{model_properties}
+    \item $\bm{M}(\bm{\theta}) = \bm{M}(\bm{\theta})^T > 0$
+    \label{item:M_symmetric}
+    \item $\dot{\bm{M}}(\bm{\theta}) - 2\bm{C}(\bm{\theta}, \bm{\zeta})$ is skew symmetric
+    \label{item:Mdot_skew_symmetric}
+    \item $\bm{z}^T\bm{D}(\bm{\theta}, \bm{\zeta})\bm{z} > \bm{0} \quad \forall \bm{z}\in\mathbb{R}^m$
+    \label{item:D_pos_def}
+    \item \label{item:D_bounded} $\norm{\bm{D}(\bm{\theta}, \bm{\zeta}_a) - \bm{D}(\bm{\theta}, \bm{\zeta}_b)} \leq D_M\norm{\bm{\zeta}_a - \bm{\zeta}_b}$
+\end{enumerate}
+
+By \cite{From2014}, $\bm{D}(\bm{\theta}, \bm{\zeta})$ can be split into a linear part $\bm{D}_L(\bm{\theta},\bm{\zeta})$ and a nonlinear part $\bm{d}_N(\bm{\theta},\bm{\zeta})$. For the control design we will make the following assumption.
+\begin{assumption}
+    The nonlinear damping $\bm{d}_N(\bm{\theta},\bm{\zeta}) \approx \bm{0}$
+\end{assumption}
+\begin{remark}
+    This is a realistic assumption since the nonlinear damping will be negligible during intervention operations. Moreover, we do not want to introduce a cancellation of nonlinear damping terms in our control law, since these model parameters are generally poorly known and the damping is dissipative. Cancelling these terms thus comes with a risk of introducing destabilizing terms.
+\end{remark}
+
+\section{Task coordinates}
+\label{sec:prelim}
+% In this chapter, the control law presented in \cite{dietrich2020} will be modified for application in the domain of UVMS, and extended with a sliding variable to increase robustness. Initially, the control is modified to account for hydrodynamic damping effects, then it is extended with a simple sliding variable before finally a sliding mode control law (SMC) is introduced. The goal of the control law is to enable completion of $r$ tasks. The approach has three requirements; that all tasks are simultaneously feasible, the total task dimension must be equal to the number of degrees of freedom of the system, and there can be no singularities in the workspace.
+
+This section introduces the decoupled task coordinates used in the control law. As in \cite{dietrich2020}, the control law relies on the following assumptions:
+\begin{assumption}
+    The total task dimension is equal to the number of degrees of freedom $m$ of the system.
+\end{assumption}
+\begin{assumption}
+    The tasks are all simultaneously feasible.
+\end{assumption}
+\begin{assumption}
+    The considered trajectories avoid any potential singularities.
+\end{assumption}
+% \todo[inline]{Må muligens omformuleres ift. gimbal lock}
+These requirements must be met when the tasks are specified, either by a human designer or a higher level planning algorithm.
+\begin{remark}
+    Note that tasks as used in this paper means a quantity given by a function of the generalized coordinates, that can follow a reference. More complex operations such as opening a door or manipulating an object requires defining suitable tasks and generating references for them. To pick up an object, one could for example have end effector position as the main task, position of a camera on the system base as a secondary task, and energy efficient joint configuration as a third. Higher level planning such as this is not considered in this paper.
+\end{remark}
+For the completion of $r$ prioritized tasks, with dimensions $m_i$, the task space positions are defined as functions of $\bm{\xi}$
+\begin{equation}
+   \bm{x}_i = \bm{f}_i(\bm{\xi})
+\end{equation}
+for $i = 1 \dots r$. This gives the \emph{task Jacobians} defined as
+\begin{equation}
+    \bm{J'}_i(\bm{\xi}) = \frac{\partial \bm{f}_i(\bm{\xi})}{\partial \bm{\xi}}
+\end{equation}
+To account for the transformation between body-fixed and inertial frames, we define
+\begin{equation}
+    \bm{J}_i(\bm{\xi}) = \bm{J'}_i(\bm{\xi}) \bm{T}_\Theta(\bm{\xi})
+\end{equation}
+which can be stacked to obtain the \emph{augmented Jacobian matrix} on task level $i$
+\begin{equation}
+    \bm{J}_i^{\rm aug}(\bm{\xi}) = \begin{bmatrix}
+        \bm{J}_1(\bm{\xi}) \\
+        \vdots \\
+        \bm{J}_i(\bm{\xi})
+    \end{bmatrix}
+\end{equation}
+giving the task space velocities
+\begin{equation}
+   \dot{\bm{x}}_i = \bm{J'}^{\rm aug}_i(\bm{\xi}) \dot{\bm{\xi}} = \bm{J}^{\rm aug}_i(\bm{\xi}) \bm{\zeta}
+\end{equation}
+and augmented task space velocities and accelerations
+\begin{equation}
+    \dot{\bm{x}}_i^{\rm aug} = \begin{bmatrix}
+        \dot{\bm{x}}_1 \\
+        \vdots \\
+        \dot{\bm{x}}_i
+    \end{bmatrix}, \quad
+    \ddot{\bm{x}}_i^{\rm aug} = \begin{bmatrix}
+        \ddot{\bm{x}}_1 \\
+        \vdots \\
+        \ddot{\bm{x}}_i
+    \end{bmatrix}
+\end{equation}
+The task space position errors are then defined as
+\begin{equation}
+    \tilde{\bm{x}}_i(t) = \bm{x}_i(t) - \bm{x}_{i, d}(t)
+\end{equation}
+where $\bm{x}_{i,d}(t)$ is the desired task space position at time $t$.
+
+To avoid high priority tasks being affected by lower priorities, lower level tasks are solved in the null space of all higher levels, utilizing the remaining DoFs of the system. To this end, the dynamically consistent null space projector from \cite{Khatib1987} is used.
+
+\begin{equation}
+    \label{eq:nullspace_proj}
+    \bm{N}_i(\bm{\xi}) = \begin{cases}
+        \bm{I}  &\text{for } i = 1\\
+        \bm{I} - \bm{J}_{i-1}^{\rm aug}(\bm{\xi})^{T} \bm{J}_{i-1}^{\rm aug}(\bm{\xi})^{M+, T} &\text{for } 1 < i \leq r
+    \end{cases}
+\end{equation}
+where $^{M+}$ denotes the dynamically consistent pseudoinverse \cite{Dietrich2015}. The null space projectors are used to define the extended task Jacobians as
+\begin{equation}
+   \bar{\bm{J}}_i(\bm{\xi}) = \bm{J}_i(\bm{\xi}) \bm{N}_i(\bm{\xi})^T
+\end{equation}
+which can be used to define decoupled task space velocities
+\begin{equation}
+   \bm{v}_i = \bar{\bm{J}}_i(\bm{\xi}) \bm{\zeta} = \underbrace{\bar{\bm{J}}_i(\bm{\xi}) \bm{J}^{\rm aug}_i(\bm{\xi})}_{\bm{B}_i(\bm{\xi})} \dot{\bm{x}}_i
+\end{equation}
+that are stacked to get the complete task space velocity vector $\bm{v} \in \mathbb{R}^n$, and the corresponding Jacobian matrix $\bar{\bm{J}}(\bm{\xi}) \in \mathbb{R}^{n \times n}$. Inserting
+\begin{equation}
+   \bm{v} = \bar{\bm{J}}(\bm{\xi}) \bm{\bm{\zeta}} \quad \text{and} \quad \dot{\bm{v}} = \dot{\bar{\bm{J}}}(\bm{\xi}) \bm{\bm{\zeta}} + \bar{\bm{J}}(\bm{\xi}) \dot{\bm{\bm{\zeta}}}
+\end{equation}
+into \eqref{eq:UVMS_equation_body} yields the decoupled equations of motion (dependencies omitted for clarity)
+\begin{align}
+    \bar{\bm{J}}^{-T}\bm{M} \bar{\bm{J}}^{-1} \dot{\bm{v}}
+    &= \bar{\bm{J}}^{-T}(\bm{\tau} + \bm{\tau}^{\text{ext}} - \bm{g})\\
+    &+ \bar{\bm{J}}^{-T}\left(
+        -\bm{C} - \bm{D}
+    \right)\bar{\bm{J}}^{-1} \bm{v} \nonumber \\
+    &+ \bar{\bm{J}}^{-T} \bm{M}\bar{\bm{J}}^{-1}\dot{\bar{\bm{J}}}\bar{\bm{J}}^{-1}\bm{v} \nonumber
+\end{align}
+We define the transformed inertia matrix as
+\begin{equation}
+    \bar{\bm{M}} = \bar{\bm{J}}^{-T}\bm{M} \bar{\bm{J}}^{-1}
+\end{equation}
+giving
+\begin{align}
+    \bar{\bm{M}} \dot{\bm{v}}
+    &= \bar{\bm{J}}^{-T}(\bm{\tau}+ \bm{\tau}^{\text{ext}} - \bm{g}) \\
+    &- \underbrace{
+        \bar{\bm{J}}^{-T} \left(
+        \bm{C} - \bm{M}\bar{\bm{J}}^{-1}\dot{\bar{\bm{J}}}
+        \right)\bar{\bm{J}}^{-1}
+    }_{\bm{\mu}} \bm{v}
+    \nonumber \\
+    &- \underbrace{
+        \bar{\bm{J}}^{-T} \left(\bm{D}_{L}\right)\bar{\bm{J}}^{-1}
+    }_{\bm{\delta}}\bm{v}
+    \nonumber
+\end{align}
+such that the matrix $\bm{\mu}$ contains the transformed Coriolis terms and $\bm{\delta}$ the transformed linear damping. The system in decoupled coordinates then takes the form:
+\begin{equation}
+    \label{eq:UVMS_equation_decoupled}
+    \bar{\bm{M}} \dot{\bm{v}}
+    = \bar{\bm{J}}^{-T}(\bm{\tau}+ \bm{\tau}^{\text{ext}} - \bm{g})
+    - (\bm{\mu} + \bm{\delta}) \bm{v}
+\end{equation}
+The transformed inertia matrix $\bar{\bm{M}}$ is block diagonal, $\bar{\bm{M}} = {\rm diag}\left(\bar{\bm{M}}_1, ..., \bar{\bm{M}}_r\right)$, where $\bar{\bm{M}}_i \in R^{m_i \times m_i}$, meaning that the tasks are decoupled at the inertial level. However, $\bm{\mu}$ and $\bm{\delta}$ still have off-diagonal terms, meaning that there is some coupling left between tasks that must be dealt with by the control law.
+
+\section{CONTROL LAW}
+% In general, assuming that the nonlinear damping forces can be cancelled is a very strong assumption, since they are hard to determine accurately. However, at the low velocities typical for intervention tasks, the nonlinear hydrodynamics are fairly small in magnitude, and will have a minor impact on the performance of a robust control law. This is discussed further in section \ref{sec:example_UVMS_modelling_errors}, and tested in simulation in section \ref{sec:simulation}.% Since intervention tasks are typically very low speed, we make the assumption and verify through simulation of low velocity tasks in \ref{sec:simulation}.
+
+\label{sec:control_law}
+The control law is chosen as
+\begin{equation}
+    \label{eq:tau_general}
+    \bm{\tau} = \bm{g} + \bm{\tau}_\mu + \bm{\tau}_{\delta} + \sum_{i=1}^{r}\bm{N}_i \bm{J}_i^T \bm{F}_{i,{\rm ctrl}}
+\end{equation}
+where $\bm{g}$ compensates for the buoyancy and gravity forces, $\bm{\tau}_{\mu}$ cancels off-diagonal terms in $\bm{\mu}$, and is defined as
+\begin{equation}
+    \label{eq:ott_tau_mu}
+    \bm{\tau}_\mu
+    = \sum_{i=1}^{r}\Bigg(\bar{\bm{J}}_i^T
+    \Bigg(\sum_{j=1}^{i-1} \bm{\mu}_{i,j}\bm{v}_j
+    + \sum_{j=i+1}^{r} \bm{\mu}_{i,j}\bm{v}_j
+    \Bigg)\Bigg)
+\end{equation}
+and $\bm{\tau}_{\delta}$ is defined equivalently to $\bm{\tau}_{\mu}$, but cancelling the off-diagonal damping terms.
+\begin{remark}
+    For systems without hydrodynamic effects, this simplifies to the expression given in \cite{dietrich2020}:
+    \begin{equation}
+        \label{eq:tau_no_damping}
+
+        \bm{\tau} = \bm{g} + \bm{\tau}_\mu + \sum_{i=1}^{r}\bm{N}_i \bm{J}_i^T \bm{F}_{i,{\rm ctrl}}
+    \end{equation}
+\end{remark}
+Applying the control law \eqref{eq:tau_general} to \eqref{eq:UVMS_equation_decoupled} gives, for $ i=1, \ldots, r$
+\begin{equation}
+    \label{eq:auv_control_law_tau_UVMS}
+    \setlength{\abovedisplayskip}{4pt}
+    \setlength{\belowdisplayskip}{4pt}
+    \bar{\bm{M}}_i \dot{\bm{v}}_i + (\bm{\mu}_{i,i} + \bm{\delta}_{i,i})\bm{v}_i = \bm{F}_{i, {\rm ctrl}} + \bm{F}^{\rm ext}_{v_i}
+\end{equation}
+and in task space coordinates:
+\begin{equation}
+    \label{eq:robman-controlled_decoupled_task}
+    \bar{\bm{M}} \ddot{\bm{x}}_i + (\bm{\mu}_{i,i} + \bm{\delta}_{i,i}) \dot{\bm{x}}_i + \bm{\gamma}_i \Bigg[ \begin{array}{c}
+        \dot{\bm{x}}_{i-1}^{\rm aug} \\
+        \ddot{\bm{x}}_{i-1}^{\rm aug} \\
+        \end{array}\Bigg]
+    = \bm{F}_{i,{\rm ctrl}}
+    + \bm{F}^{\rm ext}_{v_i}
+\end{equation}
+where
+\begin{subequations}
+    \label{eq:gamma}
+    \begin{align}
+        \bm{\gamma}_i(\bm{\xi},\dot{\bm{\xi}}) = [\bm{\Gamma_{i,1}}, \dots, \bm{\Gamma_{i,i-1}} \bm{\Psi}_{i, 1}, \dots, \bm{\Psi}_{i, i-1}]\\
+        \bm{\Gamma}_{i, j} = \bm{u}_{i,i}\bm{B}_{i,j} + \bar{\bm{M}}_i\dot{\bm{B}}_{i,j}, \quad
+        \bm{\Psi}_{i, j} = \bar{\bm{M}}_i \bm{B}_{i,j}
+    \end{align}
+\end{subequations}
+contains top-down disturbances caused by higher prioritized tasks, $\bm{\mu}_{i,i}$ is the $i$-th element on the diagonal of the Coriolis matrix, $\bm{\delta}_{i,i}$ the $i$-th element on the diagonal of the transformed damping matrix.  Note that the transformed matrices still retain the skew symmetry property from \eqref{eq:UVMS_equation_body},  i.e. $\frac{1}{2}\dot{\bar{\bm{M}}}_i - \bm{\mu}_{i,i}$ is skew symmetric \cite{dietrich2020}. $\bm{F}_{i, {\rm ctrl}}$ is the control force on level $i$, and $\bm{F}_{v_i}^{\rm ext}$ is the generalized external force on the $i$-th task in the decoupled coordinates
+\begin{equation}
+    \label{eq:F_ext}
+    \bm{F}^{\rm ext}_{v_i} = \bar{\bm{J}}^{-T}_i \bm{\tau}^{\rm ext}
+\end{equation}
+
+% Choosing the control law on this form has the issue of adding energy into the system through the $\bm{\tau}_{\delta}$ and $\bm{d}_N$ terms. Only parts of the damping is cancelled, and at low velocities the added energy is small, but the control law still looses the beneficial property of being a power conserving feedback, as is the case when only cancelling the off-diagonal terms in $\bm{\mu}$ \cite{Ott2015}. In practice, one must therefore select a large enough desired damping matrix $\bm{D}_i$ so that more energy is dissipated through the control law than added, or compensate in some other way, such as through the sliding terms suggested later.
+In the following, we will explore three alternatives for the control force $\bm{F}_{i, {\rm ctrl}}$; one equal to the one used in \cite{dietrich2020} except for the addition of a hydrodynamic damping term, one utilizing a sliding variable, and one using sliding mode control (SMC). We will show that the sliding variable and SMC approaches give better stability and robustness properties in the presence of disturbances and modelling errors, a requirement for underwater systems.
+
+\textbf{The first alternative control law} is given by
+\begin{align}
+    \setlength{\abovedisplayskip}{0pt}
+    \setlength{\belowdisplayskip}{0pt}
+    \label{eq:F_i_ctrl_orig}
+    \bm{F}_{i,{\rm ctrl}}
+    &=
+    \bar{\bm{M}}_i \ddot{\bm{x}}_{i,{\rm des}}
+    + (\bm{\mu}_{i,i} + \bm{\delta}_{i,i} )\dot{\bm{x}}_{i,{\rm des}} \\
+    &-\bm{D_i} \dot{\tilde{\bm{x}}}_i
+    -\bm{K_i} \tilde{\bm{x}}_i
+    + \bm{\gamma}_i\Bigg[ \begin{array}{c}
+    \dot{\bm{x}}_{i-1,{\rm des}}^{\rm aug} \\
+    \ddot{\bm{x}}_{i-1,{\rm des}}^{\rm aug} \\
+    \end{array}\Bigg] \nonumber
+\end{align}
+where $\bm{D_i}$ and $\bm{K_i}$ are the desired damping and stiffness matrices, respectively. They are chosen such that $\bm{D}_i = \bm{D}_i^T > \bm{0}$ and $\bm{K}_i = \bm{K}_i^T > \bm{0}$. This gives the closed-loop system on task level $i$:
+\begin{align}
+    \label{eq:CL_orig}
+    \bar{\bm{M}}_i \ddot{\tilde{\bm{x}}}_i
+    &+ (\bm{\mu}_{i,i} + \bm{\delta_{i,i}}+ \bm{D}_i)\dot{\tilde{\bm{x}}}_i
+    + \bm{K}_i \tilde{\bm{x}}_i \\
+    &=
+    - \bm{\gamma}_i\Bigg[ \begin{array}{c}
+        \dot{\tilde{\bm{x}}}_{i-1}^{\rm aug} \\
+        \ddot{\tilde{\bm{x}}}_{i-1}^{\rm aug} \\
+    \end{array}\Bigg]
+    + \bm{F}_{v_i}^{\rm ext}\nonumber
+\end{align}
+\textbf{The second alternative control law}, motivated by \cite{Slotine1987}, \cite{Berghuis1993}, and \cite{Sadegh1990}, utilizes a sliding variable:
+\begin{align}
+    \label{eq:F_i_ctrl_sliding}
+    \bm{F}_{i,{\rm ctrl}}
+    &=
+    \bar{\bm{M}}_i \ddot{\bm{x}}_{i,r}
+    + (\bm{\mu}_{i,i} + \bm{\delta}_{i,i} ) \dot{\bm{x}}_{i,r} \\
+    &- \bm{D}_i \bm{s}_i
+    - \bm{K}_i \tilde{\bm{x}}_i
+    + \bm{\gamma}_i\Bigg[ \begin{array}{c}
+        \dot{\bm{x}}_{i-1,{\rm des}}^{\rm aug} \\
+        \ddot{\bm{x}}_{i-1,{\rm des}}^{\rm aug} \\
+    \end{array}\Bigg] \nonumber
+\end{align}
+with
+\begin{equation}
+    \label{eq:sliding_var}
+    \bm{s}_i= \dot{\tilde{\bm{x}}}_i
+    + \bm{\Lambda}_i \tilde{\bm{x}}_i, \quad \quad
+    \bm{\Lambda}_i = \bm{\Lambda}_i^T >\bm{0}
+\end{equation}
+and also differs from \eqref{eq:F_i_ctrl_orig} by $\dot{\bm{x}}_{i, \rm des}$ being replaced by the reference velocity
+\begin{equation}
+    \setlength{\abovedisplayskip}{0pt}
+    \setlength{\belowdisplayskip}{0pt}
+    \dot{{\bm{x}}}_{i,r}=\dot{\bm{x}}_{i,\rm des} - \bm{\Lambda}_i \tilde{\bm{x}}_i
+\end{equation}
+The sliding variable $\bm{s}$ introduced in \cite{Slotine1987} can be interpreted as the velocity error with respect to the new reference velocity:
+\begin{equation}
+    \setlength{\abovedisplayskip}{0pt}
+    \setlength{\belowdisplayskip}{0pt}
+    \bm{s}_i=\dot{\bm{x}}_i - \dot{\bm{x}}_{i,r}
+\end{equation}
+The resulting closed-loop system is then
+\begin{subequations}
+    \label{eq:CL_sliding}
+    \begin{align}
+        \bar{\bm{M}}_i \dot{\bm{s}}_i
+        &+ (\bm{\mu}_{i,i} + \bm{\delta}_{i,i} + \bm{D}_i)\bm{s}_i
+        + \bm{K}_i \tilde{\bm{x}}_i\\
+        &=
+        - \bm{\gamma}_i\Bigg[
+            \begin{array}{c}
+                \dot{\tilde{\bm{x}}}_{i-1}^{\rm aug} \\
+                \ddot{\tilde{\bm{x}}}_{i-1}^{\rm aug} \\
+            \end{array}\Bigg]
+        + \bm{F}_{v_i}^{\rm ext} \nonumber \\
+        \dot{\tilde{\bm{x}}}_i &= - \bm{\Lambda}_i \tilde{\bm{x}}_i + \bm{s}_i
+    \setlength{\abovedisplayskip}{0pt}
+    \setlength{\belowdisplayskip}{0pt}
+    \end{align}
+\end{subequations}
+% For free motion with no disturbances from higher priority tasks, this simplifies to
+% \begin{subequations}
+% \label{eq:CL_sliding_free}
+%     \begin{align}
+%         \bar{\bm{M}} \dot{\bm{s}}
+%     &+ (\bm{\mu}_{i,i} + \bm{\delta}_{i,i} + \bm{D})\bm{s}
+%     + \bm{K} \tilde{\bm{x}}
+%     = \bm{0} \\
+%     \dot{\tilde{\bm{x}}} &= - \bm{\Lambda} \tilde{\bm{x}} + \bm{s}
+%     \end{align}
+% \end{subequations}
+
+One motivation for the choice of control law \eqref{eq:F_i_ctrl_sliding} is that, as we will show, it improves the convergence properties and significantly simplifies the stability analysis compared to [16]. Moreover, as the control law and corresponding analysis are expressed using the sliding mode variable $s$, they can readily be extended to further increase the robustness through sliding mode control in \textbf{the third alternative control law}:
+\begin{align}
+    \label{eq:F_i_ctrl_SMC}
+    \bm{F}_{i,{\rm ctrl}}
+    &=\bar{\bm{M}}_i \ddot{\bm{x}}_{i, r}
+    + (\bm{\mu}_{i,i} + \bm{\delta}_{i,i} ) \dot{\bm{x}}_{i,r}
+    - \bm{D}_i \bm{s}_i
+    - \bm{K}_i \tilde{\bm{x}}_i \\
+    &- \bm{K}_{S,i} \text{sgn} (\bm{s}_i)
+    + \bm{\gamma}_i
+    \Bigg[ \begin{array}{c}
+        \dot{\bm{x}}_{i-1,{\rm des}}^{\rm aug} \\
+        \ddot{\bm{x}}_{i-1,{\rm des}}^{\rm aug} \\
+    \end{array}\Bigg] \nonumber
+\end{align}
+where $\bm{K}_{S,i} = \bm{K}_{S,i}^T > \bm{0}$ is the sliding mode gain and $\text{sgn} (\bm{s}_i)$ is a vector containing the signs of $\bm{s}_i$. This gives the closed-loop system
+\begin{subequations}
+    \label{eq:CL_SMC}
+    \begin{flalign}
+        \bar{\bm{M}}_i \dot{\bm{s}}_i
+        &+ (\bm{\mu}_{i,i} + \bm{\delta}_{i,i} + \bm{D}_i)\bm{s}_i
+        + \bm{K}_i \tilde{\bm{x}}_i
+        + \bm{K}_{s,i} \text{sgn}(\bm{s}_i) && \raisetag{1.75\normalbaselineskip}\\
+        &=
+        - \bm{\gamma}_i\Bigg[
+        \begin{array}{c}
+            \dot{\tilde{\bm{x}}}_{i-1}^{\rm aug} \\
+            \ddot{\tilde{\bm{x}}}_{i-1}^{\rm aug} \\
+        \end{array}\Bigg]
+        + \bm{F}_{v_i}^{\rm ext} \nonumber \\
+        \dot{\tilde{\bm{x}}}_i &= - \bm{\Lambda}_i \tilde{\bm{x}}_i + \bm{s}_i
+    \setlength{\abovedisplayskip}{0pt}
+    \setlength{\belowdisplayskip}{0pt}
+    \end{flalign}
+\end{subequations}
+
+\begin{remark}[Cancellation of external forces]
+    If measurements of external forces are available, then the control law can be extended to include external force feedback. This is done in \cite{dietrich2020} and used in \cite{Wu2022} to fully compensate for the top-down disturbances. However, as this will typically not be possible for underwater systems, and specifically is not available for the considered AIAUV, it will not be discussed further here.
+\end{remark}
+
+\section{STABILITY ANALYSIS}
+\label{sec:stability_proofs}
+
+% \subsection{Sliding variable without hydrodynamic damping}
+% \label{sec:stability-sliding}
+% First we consider the controller \eqref{eq:F_i_ctrl_sliding} for the special case of systems where there is no hydrodynamic damping, for example land-based vehicles and industrial robot manipulators. The control force can be written as:
+% \begin{align}
+%     \label{eq:F_i_ctrl_sliding_no_damping}
+%     \bm{F}_{i,{\rm ctrl}}
+%     &=
+%     \bar{\bm{M}}_i \ddot{\bm{x}}_{i,{\rm r}}
+%     + \bm{\mu}_{i,i} \dot{\bm{x}}_{i,{\rm r}} \\
+%     &- \bm{D}_i \bm{s}_i
+%     - \bm{K}_i \tilde{\bm{x}}_i
+%     + \bm{\gamma}_i\Bigg( \begin{array}{c}
+%         \dot{\bm{x}}_{i-1,{\rm des}}^{\rm aug} \\
+%         \ddot{\bm{x}}_{i-1,{\rm des}}^{\rm aug} \\
+%     \end{array}\Bigg) \nonumber
+% \end{align}
+
+We consider the case of free motion ($\bm{F}^{\rm ext}=\bm{\tau}^{\rm ext}=\bm{0}$), and define $\bm{y}$ and the sets ${\cal{A}}_i$ analogously to \cite[Section IV.A]{dietrich2020}. The state vector $\bm{y} \in \mathbb{R}^{2n}$ is defined as
+\begin{equation}
+   \bm{y}_i = \begin{bmatrix}
+        \tilde{\bm{x}}_i \\
+        \bm{s}_i \\
+    \end{bmatrix},
+    \bm{y} = \begin{bmatrix}
+        \bm{y}_1 \\
+        \vdots \\
+        \bm{y_r}
+    \end{bmatrix}
+\end{equation}
+representing task-space position, and velocity errors of all tasks. The stability of the equilibrium point $\bm{y} = \bm{0}$, where all task-space errors are $\bm{0}$, will be examined. The \emph{nested sets for the successive accomplishment of tasks} \cite{dietrich2020} are defined with $\mathcal{A}_0$ being the full state space of the system, and
+\begin{equation}
+    \label{eq:set_A1}
+    {\cal A}_1 = \{ \space \bm{y} \mid \tilde{\bm{x}}_1 = \bm{0}, \bm{s}_1 = \bm{0} \}
+\end{equation}
+being the subset of the task space where the highest prioritized task is fulfilled. Sets $\mathcal{A}_2 ... \mathcal{A}_r$ are defined recursively as subsets of the previous set with one more completed task.
+
+\begin{equation}\label{eq:set_Ai}
+    \mathcal{A}_i = \mathcal{A}_{i-1} \bigcap \{\space \bm{y} \mid \tilde{\bm{x}}_i = \bm{0}, \bm{s}_i = \bm{0} \}
+\end{equation}
+
+\subsection{Stability analysis with control law \eqref{eq:F_i_ctrl_orig}}
+For $\bm{y} \in {\cal{A}}_{i-1}$ in free motion ($\bm{F}^{\rm ext}=\bm{\tau}^{\rm ext} = \bm{0}$), the closed-loop task error dynamics on priority level $i$ becomes
+\begin{equation}
+    \label{eq:closed_loop_task_orig_free}
+    \bar{\bm{M}}_i \ddot{\tilde{\bm{x}}}_i
+    + (\bm{\mu}_{i,i} + \bm{\delta_{i,i}}+ \bm{D}_i)\dot{\tilde{\bm{x}}}_i
+    + \bm{K}_i \tilde{\bm{x}}_i
+    = \bm{0}
+\end{equation}
+
+The following theorem follows directly from the analysis of \cite{dietrich2020}. Specifically, it is straightforward to include the hydrodynamic damping terms in the analysis of \cite{dietrich2020}, and defining $\bm{y}^*$ as
+\begin{equation}
+    \label{eq:y_x_dot}
+    \bm{y}^*_i = \begin{bmatrix}
+         \tilde{\bm{x}}_i \\
+         \dot{\tilde{\bm{x}}}_i \\
+     \end{bmatrix},
+     \bm{y}^* = \begin{bmatrix}
+         \bm{y}_1^* \\
+         \vdots \\
+         \bm{y_r^*}
+     \end{bmatrix}
+ \end{equation}
+to prove the following result:
+
+\begin{theorem}
+    \label{thm:stability_original}
+    Consider the closed-loop task error dynamics of system \eqref{eq:UVMS_equation_body} with control law \eqref{eq:tau_general}, \eqref{eq:F_i_ctrl_orig}. For free motion ($\bm{F}^{\rm ext}=\bm{\tau}^{\rm ext} = \bm{0}$), the origin $\bm{y}^* = \bm{0}$ of the closed-loop task error dynamics is UAS.
+    % Consider the system \eqref{eq:UVMS_equation_body} in free motion (). Then the control law \eqref{eq:tau_no_damping}, \eqref{eq:F_i_ctrl_sliding_no_damping} with $\bm{\Lambda}_i>0$ diagonal makes the origin of the closed-loop task error dynamics \eqref{eq:CL_sliding_free} UAS. Moreover, the closed-loop task dynamics of the highest priority task is GES and the task dynamics of each task is exponentially stable when all higher level tasks are fulfilled.
+\end{theorem}
+
+\subsection{Stability analysis with control law \eqref{eq:F_i_ctrl_sliding}}
+\label{sec:stability-sliding}
+
+In this section, we consider the closed-loop task error dynamics \eqref{eq:CL_sliding}. For the case of free motion, and for $\bm{y} \in {\cal{A}}_{i-1}$, the closed-loop task error dynamics on task level $i$ becomes
+\begin{subequations}
+    \label{eq:CL_sliding_free}
+    \begin{align}
+        \bar{\bm{M}}_i \dot{\bm{s}}_i
+        + (\bm{\mu}_{i,i} + \bm{\delta}_{i,i} &+ \bm{D}_i)\bm{s}_i
+        + \bm{K}_i \tilde{\bm{x}}_i
+        = \bm{0} \\
+        \dot{\tilde{\bm{x}}}_i = - \bm{\Lambda}_i \tilde{\bm{x}}_i + \bm{s}_i&
+    \end{align}
+\end{subequations}
+
+
+% \begin{subequations}
+%     \label{eq:CL}
+%     \begin{align}
+%     \bar{\bm{M}}_i \dot{\bm{s}}_i + \bm{\mu}_{i,i}\bm{s}_i + \bm{K}_i \tilde{\bm{x}}_i &= 0 \\
+%     \dot{\tilde{\bm{x}}}_i &= - \bm{\Lambda}_i \tilde{\bm{x}}_i + \bm{s}_i
+%     \end{align}
+% \end{subequations}
+
+\begin{theorem}
+    \label{thm:stability_sliding}
+    Consider the closed-loop task error dynamics consisting of system \eqref{eq:UVMS_equation_body} with control law \eqref{eq:tau_general}, \eqref{eq:F_i_ctrl_sliding} with $\bm{\Lambda}_i=\lambda_i \bm{I}, \lambda_i > 0, i=1,...,r$. For free motion ($\bm{F}^{\rm ext}=\bm{\tau}^{\rm ext} = \bm{0}$), the origin $\bm{y} = \bm{0}$ of the closed-loop task error dynamics is UAS. Moreover, the closed-loop task dynamics of the highest priority task is ES and the task dynamics of each lower priority task is exponentially stable when all higher level tasks are fulfilled.
+    % and let Assumptions X-X hold.
+\end{theorem}
+\begin{proof}
+    \label{prf:stability_sliding}
+    To analyze the stability of the closed-loop task error dynamics on  priority level $i$, we use the Lyapunov function candidate
+    \begin{equation}\label{eq:Vi}
+        V_i(\bm{s}_i,\tilde{\bm{x}}_i) = \frac{1}{2}\bm{s}_i^T \bar{\bm{M}}_i \bm{s}_i + \frac{1}{2}\tilde{\bm{x}}_i ^T \bm{K}_i \tilde{\bm{x}}_i
+    \end{equation}
+    and its time deritive, given by:
+    \begin{equation}
+        \label{eq:V_dot_unsolved}
+        \dot{V_i} = \frac{1}{2}\bm{s}_i^T \dot{\bar{\bm{M}}}_i \bm{s}_i + \bm{s}_i^T \bar{\bm{M}}_i\dot{s}_i
+        + \tilde{\bm{x}}_i^T \bm{K_i} \dot{\tilde{\bm{x}}}_i
+    \end{equation}
+    Inserting \eqref{eq:CL_sliding_free}, and utilizing that $\frac{1}{2} \dot{\bar{\bm{M}}}_i - \bm{\mu}_{i,i}$ is skew-symmetric, gives: %We choose $\bm{\Lambda}_i$ diagonal such that $\frac{1}{2}(\bm{\Lambda}_i \bm{K}_i + \bm{K}_i \bm{\Lambda}_i)$ is both symmetric and positive definite
+    % and Property 4 of \eqref{eq:UVMS_equation_body} ----- Ikke lenger nødvendig
+    \begin{equation}
+        \label{eq:Vi_dot}
+        \dot{V}_{i} =
+        -\bm{s}_i^T (\bm{D}_i + \bm{\delta}_{i,i}) \bm{s}_i
+        - \tilde{\bm{x}}_i^T \bm{\Lambda}_i \bm{K}_i \tilde{\bm{x}}_i
+    \end{equation}
+
+    We choose $\bm{\Lambda}_i=\lambda_i \bm{I}$ with $\lambda_i > 0$ constant. Using $\lambda_{\min}$ and $\lambda_{\max}$ as minimum and maximum eigenvalues of a matrix, by \cite[Theorem 4.10]{Khalil2002} the origin of \eqref{eq:CL_sliding_free} is ES, with:
+    \begin{subequations}
+        \label{eq:k_i}
+        \begin{align}
+            k_{1,i} &= \frac{1}{2}\min\{\lambda_{\min}(\bar{\bm{M}}_i),\lambda_{\min}(\bm{K}_i)\} \\
+            k_{2,i} &= \frac{1}{2}\max\{\lambda_{\max}(\bar{\bm{M}}_i),\lambda_{\max}(\bm{K}_i)\} \\
+            k_{3,i} &= \min\{\lambda_{\min}(D_m(\bm{D}_i + \bm{\delta}_{i,i})),\lambda_i \cdot \lambda_{\min}(\bm{K}_i)\}
+        \end{align}
+    \end{subequations}
+
+
+    % The proof of asymptotic stability of \cite[Sec. IV.E]{dietrich2020} can then be performed (more easily) with this Lyapunov function candidate. Unlinke that proof, there is no need to use a modified Lyapunov function as \ref{eq:Vi_dot} is already negative definite.
+
+    % Utilizing Theorem \ref{thm:omega_uas} it can be shown that the highest priority task is UAS if the second highest priority task is UAS and so on. The goal is to prove stability of the equilibrium $y = 0$ for the total system.
+
+    To analyze the stability of the equilibrium point $\bm{y}=\bm{0}$ of the total closed-loop task error dynamics including all priority levels, we will use \cite[Theorem 2]{Wang2008}, cf. Appendix~\ref{sec:appendix}. Note that since \eqref{eq:Vi} is a strict Lyapunov function of the system \eqref{eq:CL_sliding_free}, the proof becomes quite a lot simpler than the corresponding proof in \cite{dietrich2020}, avoiding the two-step process that was needed to handle a non-strict Lyapunov function.
+
+    \begin{enumerate}
+        \item  We start by analyzing the error dynamics of the   lowest priority task, $i = r$, within $\mathcal{A}_{r-1}$ (i.e. when all tasks are completed except the lowest prioritized). By the above analysis $\bm{y}_r = \bm{0}$ is ES, which implies by Definition \ref{def:omega_uas} that the origin of the total system $\bm{y} = \bm{0}$ is $\mathcal{A}_{r-1}$-UAS
+
+        \item \label{step:theorem_2}
+        For $i = r - 1$, within $\mathcal{A}_{r-2}$, by the above analysis, $\dot{V}_i$ is negative definite, and with $k_{1,i}, k_{2,i}$, $k_{3,i}$ defined by \eqref{eq:k_i} \eqref{eq:omega_uas_1} is satisfied with $W_1 = k_{1,i}\norm{y}^2$, $W_2 = k_{2,i}\norm{y}^2$ and \eqref{eq:omega_uas_2} is satisfied with $\alpha(W_1) = \frac{k_{3,i}}{k_{1,i}} W_1$. Along with the fact from the previous step that the origin, $\bm{y} = \bm{0}$, is $\mathcal{A}_{i}$-UAS, we can use Theorem \ref{thm:omega_uas} to conclude that it is also is $\mathcal{A}_{i-1}$-UAS
+
+        \item Step \ref{step:theorem_2} is repeated recursively for each $i$ until we reach $i = 1$. We now have that $\bm{y} = \bm{0}$ is $\mathcal{A}_{1}$-UAS
+
+        \item In the complete task space $\mathcal{A}_{0}$, with the origin being $\mathcal{A}_{1}$-UAS and $\dot{V}_1$ negative definite, we can use Theorem \ref{thm:omega_uas} again, and conclude that the origin of the complete system, $\bm{y} = \bm{0}$, is UAS.
+
+        % \item Since $V_1$ is also decrescent and radially unbounded, the origin of the highest prioritized task is UAS by \cite[Theorem 4.9]{Khalil2002}. % uniformly globally asymptotically stable (UAS)
+
+        % \item Since all tasks converge when higher prioritized tasks are fulfilled and the origin of task 1 is UAS, the origin of the complete system is also UAS.
+
+        % \todo[inline]{Hver task er "globalt" stabil i A\_i, og vist UGAS for høyeste task. $->$ Hver task konvergerer når høyere tasks har konvergert $->$ UGAS for hele systemet}
+        % \todo[inline]{Bortsett fra mulige singulariteter i tasks og attitude}
+
+        \item Moreover, choosing $k_{1,1}$, $k_{2,1}$ and $k_{3,1}$ as in \eqref{eq:k_i}, we can conclude exponential stability (ES) of the highest priority task dynamics by \cite[Theorem 4.10]{Khalil2002}
+        %since $\mathcal{A}_0$ constitutes the full state space,
+    \end{enumerate}
+    Thus, the equilibrium point $\bm{y}=\bm{0}$, where all tasks are fulfilled, is UAS. The task dynamics of the highest priority task is also exponentially stable, and the dynamics of each task is exponentially stable when all higher level tasks are fulfilled. This implies that the highest prioritized task will always converge  exponentially, and that each task will converge exponentially when all higher level tasks are fulfilled.
+\end{proof}
+\begin{remark}
+    As exponential stability in addition to improved convergence properties also provides stronger robustness properties than uniform asymptotic stability, cf. \cite[Lemmas 9.2 and 9.3]{Khalil2002} we can thus expect that the proposed control law \eqref{eq:F_i_ctrl_sliding} provides both improved convergence and robustness compared to \eqref{eq:F_i_ctrl_orig}.
+\end{remark}
+
+\begin{remark}
+    Note that the inherent system damping, $\bm{D}(\bm{\theta}, \bm{\zeta})\bm{\zeta}$, in \eqref{eq:UVMS_equation_body} is not required for the closed-loop system analysis to hold. The inherent damping only improves the convergence rate, cf. \eqref{eq:k_i}, and the resulting compliant behavior is characterized by $\bm{D}_{\text{total}, i}= \bm{D}_i + \bm{\delta}_{i,i}$, but the analysis also holds for systems \eqref{eq:UVMS_equation_body} where $\bm{D}(\bm{\theta}, \bm{\zeta})\bm{\zeta}=\bm{0}$.
+\end{remark}
+
+% \subsubsection{Passivity properties}
+% The term $\bm{K}_i \tilde{\bm{x}}_i + \bm{g} + \bm{\tau}_\mu$ shapes the potential energy in a desired way, as is reflected by the energy function \eqref{eq:Vi}. Second, the compensation of $\bar{\bm{M}}_i$ and $\bm{\mu}_{i,i}$ modifies the kinetic energy in a desired way, cf.~\eqref{eq:Vi}, using the new reference velocity (and without requiring acceleration measurements). Third, the term $\bm{D}_i \bm{s}_i$ injects damping in the closed-loop system in order to achieve the trajectory tracking objective. The energy-interpretation of the control law makes it appropriate to denote it a passivity-based control law.
+
+% \begin{theorem}
+%     \label{thm:passivity_sliding_no_damping}
+%     Consider the system \eqref{eq:UVMS_equation_body}, without hydrodynamic damping. Then the control law \eqref{eq:tau_no_damping}, \eqref{eq:F_i_ctrl_sliding_no_damping} with $\bm{\Lambda}_i>0$ diagonal makes the system strictly state passive, and output strictly passive with respect to $F^{\text{ext}}$, with $\bm{s}_i$ as output
+% \end{theorem}
+
+% \begin{proof}
+%     For $\bm{y} \in {\cal{A}}_{i-1}$ the closed-loop system \eqref{eq:CL_sliding_Fext} becomes
+%     \begin{subequations}
+%         \label{eq:CL_passivity}
+%         \begin{align}
+%             \bar{\bm{M}}_i \dot{\bm{s}}_i + (\bm{\mu}_{i,i} + \bm{D}_i)\bm{\bm{s}}_i + \bm{K}_i \tilde{\bm{x}}_i &= \bm{F}_{i}^{\rm ext} \\
+%             \dot{\tilde{\bm{x}}}_i &= - \bm{\Lambda}_i \tilde{\bm{x}}_i + \bm{\bm{s}}_i
+%         \end{align}
+%     \end{subequations}
+%     using the energy function \eqref{eq:Vi} as a storage function, this leads to
+%     \begin{subequations}
+%         \begin{align}
+%             \label{sF_geq_v_dot}
+%             \bm{\bm{s}}_i^T \bm{F}_{i}^{\rm ext}  &=  \dot{V}_{i} + \bm{\bm{s}}_i^T \bm{D}_i \bm{\bm{s}}_i + \tilde{\bm{x}}_i ^T\bm{\Lambda}_i \bm{K}_i \tilde{\bm{x}}_i \\
+%             \bm{s}_i^T \bm{F}_{i}^{\rm ext} &\geq \dot{V}_{i} + \min\{\lambda_{\min}(\bm{D}_i),\lambda_i \bm{K}_i\}  \cdot || [ \bm{s}_i, \tilde{x}_i ] ||^2 \\
+%             \bm{s}_i^T \bm{F}_{i}^{\rm ext} &\geq \dot{V}_{i} +  \lambda_{\min}(\bm{D}_i)   \bm{s}_i^T \bm{s}_i
+%         \end{align}
+%     \end{subequations}
+%     meaning that the system is (state) strictly passive with
+%     \begin{equation}
+%         \label{eq:psi_passivity_strict}
+%         \bm{\psi}(\bm{s}_i,\tilde{\bm{x}}_i) = \min\{\lambda_{\min}(\bm{D}_i),\lambda_i \bm{K}_i\}  \cdot || [ \bm{\bm{s}}_i, \tilde{\bm{x}}_i ] ||^2
+%     \end{equation}
+%     and output strictly passive with
+%     \begin{equation}
+%         \label{eq:rho_output_passive}
+%         \bm{\rho}(\bm{s}_i) = - \lambda_{\min}(\bm{D}_i) \bm{\bm{s}}_i
+%     \end{equation}
+%     using the notation from \cite[Definition 6.3]{Khalil2002}
+% \end{proof}
+
+% It is interesting to notice the difference in passivity properties from the controller and passivity analysis of \cite{Ott2015}. The new controller obtains the stronger passivity property of (state) strict passivity, meaning that energy is dissipated from the system as long as the system state is non-zero. Moreover, while the output strict passivity of \cite{Ott2015} had the velocity as output,  here $\bm{s}_i$ is the output, meaning that energy is dissipated from the system as long as the configuration error $\tilde{x}_i$ does not converge exponentially to zero.
+
+\subsection{Stability analysis with control law \eqref{eq:F_i_ctrl_SMC}}
+\label{sec:stability_SMC}
+Using the control force \eqref{eq:F_i_ctrl_SMC} in free motion without disturbances, the same Lyapunov function candidate $V_i$ as in \eqref{eq:Vi} can be used with the only difference that the time-derivative of $V_i$ has an extra sliding mode term
+\begin{align}
+    \label{eq:V_i_dot_SMC}
+    \dot{V_i} &= -\bm{s}_i^T (\bm{D}_i + \bm{\delta}_{i,i}) \bm{s}_i - \bm{s}_i^T \bm{K}_{S,i} \text{sgn}(\bm{s}_i)- \tilde{\bm{x}}_i ^T\bm{\Lambda}_{i} \bm{K}_i \tilde{\bm{x}}_i \nonumber\\
+    & \leq -\bm{s}_i^T (\bm{D}_i + \bm{\delta}_{i,i}) \bm{s}_i
+    - \tilde{\bm{x}}_i^T \bm{\Lambda}_i \bm{K}_i \tilde{\bm{x}}_i
+\end{align}
+Thus, the analysis from Section \ref{sec:stability-sliding} still holds, and Theorem \ref{thm:stability_sliding} holds with \eqref{eq:F_i_ctrl_sliding} replaced by \eqref{eq:F_i_ctrl_SMC} if a Lipschitz continuous approximation of the sign term is used (as in \cite[Chaper 14.2]{Khalil2002}). However, we want to show robustness. Therefore, we consider the system perturbed by modeling errors and other state- and time-varying disturbances, for which the resulting closed-loop level $i$ task error dynamics for free motion and for $\bm{y} \in {\cal{A}}_{i-1}$ can be described by
+% We can of course use that
+% \begin{equation}
+% \dot{\bm{V}_i} \leq -\bm{s}_i^T \bm{D}_i \bm{s}_i - \tilde{\bm{x}}_i ^T \bm{\Lambda}_i \bm{K}_i \tilde{\bm{x}}_i
+% \end{equation}
+% and the analysis from section \ref{sec:stability-sliding} still holds, but we want to prove robustness. To show this,
+\begin{subequations}
+    \label{eq:CL_SM_robust}
+    \begin{align}
+        \bar{\bm{M}}_i \dot{\bm{s}}_i
+        &+ (\bm{\mu}_{i,i}+ \bm{\delta}_{i,i} + \bm{D}_i)\bm{s}_i
+        + \bm{K}_i \tilde{\bm{x}}_i \\
+        &+\bm{K}_{S,i} \text{sgn}(\bm{s}_i)
+        + \bm{f}_i(\bm{s}_i,\tilde{\bm{x}}_i,t) = \bm{0} \nonumber \\
+        \dot{\tilde{\bm{x}}}_i &= - \bm{\Lambda}_i \tilde{\bm{x}}_i + \bm{s}_i
+    \end{align}
+\end{subequations}
+where $\bm{f}_i(\bm{s}_i,\tilde{\bm{x}}_i,t)$ is a disturbance term representing modeling errors and other state- and time-varying disturbances that satisfy
+\begin{assumption}
+    \label{ass:bounded_disturbance}
+     \begin{equation*}
+        |\bm{f}_{i, j}(\bm{s}_i,\tilde{\bm{x}}_i,t)|\leq \bm{L}_{i,j} \quad j \in \{1,\dots,m_i\}
+    \end{equation*}
+where $\bm{f}_{i, j}$ is the j-th element of $\bm{f}_{i}$, and $\bm{L}_i$ is a vector of positive elements with the same dimension as $\bm{s}_i$ and $\bm{f}_i$.
+\end{assumption}
+
+\begin{theorem}
+    \label{thm:robustness_SMC}
+    Consider the closed-loop task error dynamics consisting of system \eqref{eq:UVMS_equation_body} subject to a disturbance term satisfying Assumption \ref{ass:bounded_disturbance}, with control law \eqref{eq:tau_general}, \eqref{eq:F_i_ctrl_SMC} with $\bm{\Lambda}_i=\lambda_i \bm{I}, \lambda_i > 0, i=1,...,r$, and $\bm{K}_{S,i}$ diagonal with $\bm{K}_{S,i,j} \geq \bm{L}_{i,j}$ For free motion ($\bm{F}^{\rm ext}=\bm{\tau}^{\rm ext} = \bm{0}$), the sliding variable $\bm{s}_i$ converges to zero in finite time, after which the origin of task position error $\tilde{\bm{x}}_i$ is exponentially stable.
+
+\end{theorem}
+\begin{proof}
+Using the same Lyapunov function candidate $V_i$ as in \eqref{eq:Vi}, the time derivative becomes
+\begin{align}
+    \dot{V_i} = -\bm{s}_i^T (\bm{D}_i+ \bm{\delta}_{i,i}) \bm{s}_i
+    &- \tilde{\bm{x}}_i ^T\bm{\Lambda}_i \bm{K}_i \tilde{\bm{x}}_i\\
+    &- \bm{s}_i^T \bm{K}_{S,i} \text{sgn}(\bm{s}_i)
+    + \bm{s}_i^T \bm{f}_i(\bm{s}_i,\tilde{\bm{x}}_i,t)  \nonumber \\
+    %
+    \leq -\bm{s}_i^T (\bm{D}_i+ \bm{\delta}_{i,i}) \bm{s}_i
+    &- \tilde{\bm{x}}_i ^T\bm{\Lambda}_i \bm{K}_i \tilde{\bm{x}}_i \\
+    &- |\bm{s}_i^T| (\text{diag}(\bm{K}_{S,i}) - \bm{L}_i) \nonumber
+\end{align}
+Where $|\bm{s}_i^T|$ is the elementwise absolute values of $\bm{s}_i$, and $\text{diag}(\bm{K}_{S,i})$ is a vector consisting of the elements on the diagonal of $\bm{K}_{S,i}$. By choosing $\bm{K}_{S,i,j} > \bm{L}_{i,j}$, $\bm{s}_i$  thus converges to zero in finite time by the comparison principle \cite{Khalil2002}. The dynamics of the position error are given in (\ref{eq:CL_SM_robust}b). This is a linear system that is clearly ISS in regard to $\bm{s}_i$ and ES when $\bm{s}_i = \bm{0}$.
+
+% , this gives
+
+% \begin{equation}
+    %     \dot{V_i} \leq - (\text{diag}(\bm{K}_{S,i}) - \bm{L}_i) |\bm{s}_i^T|
+% \end{equation}
+\end{proof}
+
+% \begin{equation}
+%     \dot{V_i} \leq -\bm{s}_i^T \bm{D}_i \bm{s}_i
+%     - \tilde{\bm{x}}_i ^T\bm{\Lambda}_i \bm{K}_i \tilde{\bm{x}}_i
+% \end{equation}
+% The analysis of the total system thus follows directly from the analysis in Section \ref{sec:stability-sliding}.
+\begin{remark}
+    Theorem \ref{thm:omega_uas} cannot be used in this case as it requires a Lipschitz system. An equivalent theorem for non-Lipschitz systems is not known to us, and therefore stability for the total system can not be rigorously proven even with improved robustness for the dynamics of each task.  However, the simulations in Section \ref{sec:simulation} shows that the control law behaves well in practice.
+\end{remark}
+\begin{remark}
+    Note that the assumption on the disturbance term is an assumption on the modelling errors and disturbances only. This is in contrast to similar assumptions for sliding mode control approaches where no knowledge of the structure and properties of the model are utilized, and which instead aim to override all the dynamics through a (higher gain) sliding mode term. This would require an assumption that the whole system dynamics are bounded to prove stability, while we here utilize the model structure and properties and consequently arrive at a milder assumption.
+\end{remark}
+
+\begin{remark}
+    It is also notable that Assumption \ref{ass:bounded_disturbance} only requires the modeling errors and disturbances that depend on same and {\em lower}-priority task variables to be bounded. Specifically, $\bm{f}_i$ depends only on same and lower-priority tasks (as higher-priority tasks are assumed to be satisfied.)
+    % i.e. $\bm{y} \in {\cal{A}}_{i-1}$, in the analysis.)
+\end{remark}
+
+\section{SIMULATIONS}
+\label{sec:simulation}
+
+The proposed control laws were implemented on an Eelume 150 AIAUV in simulation. The model in the simulator consists of an elongated body with $4$ $z$-revolute and $4$ $y$-revolute joints, giving a total of $m = 14$ DoFs. It can be thought of as a manipulator arm with no separate base, however, it is convenient to treat the first link as a base and use the notation for general UVMSs. The system is actuated by the joints and $7$ thrusters. The thrusters can produce up to $60$ N of force each, and the joints motors up to $16$ Nm of torque. Further details, including model parameters can be found in \cite{Schmidt2018,Borlaug2020a}.
+
+In the simulation, a task hierarchy with three different tasks were chosen; end-effector position, end-effector orientation and joint angles. The initial reference configuration of the system at rest has its base in the world frame origin, and $45$ deg angles in the  $y$-revolute joints. The desired trajectories are shown in Fig.~\ref{fig:trajectories}, and are defined such that the end-effector should move smoothly 1 meter forwards and back again while keeping its initial orientation. Simultaneously, the joints should move to a "C-shape", as in Fig.~\ref{fig:Eely}, with $30$ deg angles in the $z$-revolute joints.
+
+To investigate the robustness to modelling errors, the control laws were implemented with a constant $10\%$ error in the inertia matrix, which also impacts the Coriolis terms. The initial configuration was also chosen with $25$ cm offset in $x$, $y$ and $z$ in base position and $1$ deg error in all joint angles, giving a fairly substantial initial error in the end-effector position and orientation. The chosen controller parameters can be seen in Tables \ref{tab:tuning_params} and \ref{tab:tuning_params_sliding}, with the same values being used for all three alternatives. To avoid chattering, the sign term in \eqref{eq:F_i_ctrl_SMC} was approximated as: $\text{sgn}(s) \approx \frac{s}{|s| + 0.01}$.
+
+\begin{table}[thpb]
+    \caption{The controller parameters used in the simulation.}
+    \centering
+    \label{tab:tuning_params}
+    \begin{tabular}{|c|c|c|}
+    \hline
+
+    Task & Parameter & Value \\
+    \hline
+    Level 1 & $K_i$ & diag(40, 30, 30) \\
+    & $D_i$ & diag(20, 30, 30)  \\
+    \hline
+
+    Level 2 & $K_i$ & diag(10, 10, 15) \\
+    & $D_i$ & diag(40, 40, 60)  \\
+    \hline
+
+    Level 3 & $K_i$ & diag(10, 10, $\dotsi$, 10) \\
+    & $D_i$ & diag(5, 5, $\dotsi$, 5)  \\
+    \hline
+    \end{tabular}
+\end{table}
+\setlength\intextsep{0pt}
+\begin{table}[htb]
+    \caption{The sliding variable parameters used in the simulation.}
+    % $\Lambda_s$ is the sliding bandwidth, and $K_s$ is the sliding mode gain.
+    \centering
+    \label{tab:tuning_params_sliding}
+    \begin{tabular}{|c|c|c|}
+        \hline
+        Task & Parameter & Value \\
+        \hline
+        Level 1,2,3 & $\Lambda_i$ & diag(0.4, 0.4, $\dotsi$, 0.4) \\
+        & $K_{S,i}$ & diag(20, 20, $\dotsi$, 20) \\
+        \hline
+    \end{tabular}
+\end{table}
+
+\begin{figure}[]
+    \centering
+    \vspace{5pt}
+    \includegraphics[width=0.9\linewidth]{figures/CCTA/trajectories_collected_crop.pdf}
+    \caption{Desired task trajectories. (Note that $y_d = z_d = 0$ at all times)}
+    \label{fig:trajectories}
+\end{figure}
+
+\begin{figure}[]
+    \centering
+    \vspace{5pt}
+    \includegraphics[width=0.9\linewidth]{figures/CCTA/init_error/abs_error_comparison.eps}
+    \caption{Absolute errors of all tasks compared for the alternative control laws}
+    \label{fig:abs_err}
+\end{figure}
+
+\begin{figure}
+    \centering
+    \includegraphics[width=0.9\linewidth]{figures/CCTA/init_error/forces_torques.eps}
+    \caption{Applied thruster forces and joint torques for the control laws}
+    \label{fig:thruster_forces}
+\end{figure}
+
+% \missingfigure{Legg inn joint torques}
+The absolute errors of the three tasks are shown in Fig.~\ref{fig:abs_err}, and the applied thruster forces are shown in Fig.~\ref{fig:thruster_forces}. All three alternatives achieve functionally perfect tracking of the main task, with errors in the order of millimeters after the initial transient. Alternatives 1 and 2 display some oscillations before settling when compensating for the initial error.
+
+The differences in performance on the second task are much clearer, with larger errors. This is expected as the top-down disturbances from the higher priority task affects performance. Alternative 1 does not manage to eliminate the initial error before movement starts, and has fairly large errors throughout. Notably, alternative 2 seems to perform better than alternative 3. Finally, in the joint angles task, there is a large top down disturbance that causes large initial errors for alternatives 1 and 2. Alternative 3 achieves much better performance during the transient from the initial error, and slightly better performance throughout the simulation.
+
+In Fig.~\ref{fig:thruster_forces}, the applied thruster forces and joint torques for the three alternatives are shown. All three alternatives show an initial spike in applied force, which would be less prevalent in the real system as thruster dynamics are neglected in the simulation. After the initial spike, alternative 1 applies notably higher forces and torques than alternatives 2 and 3, attempting to compensate for the larger errors in the two lowest prioritized tasks. However, all three alternatives stay within the limits of the actuators. Overall, alternatives 2 and 3 perform noticeably better than alternative 1, having both faster convergence and better tracking on lower priority tasks while applying lower forces and torques.
+
+\section{CONCLUSIONS}
+\label{sec:CCTA:conclusions}
+To enable autonomous completion of subsea intervention tasks, a controller that allows strict task priorities and compliant contact behavior while being robust to disturbances and modelling errors is needed. In this paper a robust control law for vehicle-manipulator systems was developed, which allows utilizing kinematic redundancy for completion of simultaneous tasks in strict priority, with a specified compliant behavior during interaction. While developed specifically for floating-base underwater systems, the control law can also be applied to fixed-base or mobile systems on land. The resulting closed-loop system was proven to be UAS, with exponentially stable dynamics for the highest prioritized task, and to have beneficial robustness properties. The theory and the effectiveness of the proposed control law were verified in a simulation study. In the future, simulations with interaction tasks should be performed, and physical experiments conducted to further validate the control law.
+
+\section{}
+% \subsection{}
+\label{sec:appendix}
+
+\setcounter{theorem}{0}
+\setcounter{equation}{0}
+\setcounter{definition}{0}
+
+\renewcommand{\thetheorem}{A.\arabic{theorem}}
+\renewcommand{\theequation}{A.\arabic{equation}}
+\renewcommand{\thedefinition}{A.\arabic{definition}}
+
+\begin{definition}
+    \label{def:omega_uas}
+    A system is said to be $\Omega$-US if it is US conditional on the set $\Omega$, that is,
+    \begin{equation}
+        \label{eq:omega_us}
+        \forall z_0 \in \Omega, \norm{z_0} < \delta(\epsilon) \implies \norm{z_0} < \epsilon, \quad \forall t > 0
+    \end{equation}
+    It is $\Omega$-UAS if it is $\Omega$-US and uniformly attractive on $\Omega$.
+\end{definition}
+
+\begin{samepage}
+We here restate \cite[Theorem 2]{Wang2008} for completeness.
+\begin{theorem}
+    \label{thm:omega_uas}
+    For a time-varying  system $\dot{\bm{x}} = \bm{f}(t,\bm{x})$ with $\bm{x} \in \mathbb{R}^n$, $\bm{f} : \mathbb{R}_{\geq0} \times \mathcal{D} \rightarrow \mathbb{R}^n$, where $\mathcal{D} \subset \mathbb{R}^n$ is a domain with $\bm{x} = \bm{0}$ and $\bm{f}(t, \bm{0}) \equiv \bm{0} \quad \forall t > t_0$. It is assumed that $\bm{f}$ is continuous and locally Lipschitz in $\bm{x}$ uniformly in $t$. If there exists a function $V(t,\bm{x}) \in \mathcal{C}^1(\mathbb{R}_{\geq t_0} \times \mathcal{D}, \mathbb{R}_{\geq 0})$, and positive semidefinite functions $W_1$ and $W_2$ such that
+    \begin{equation}
+        \label{eq:omega_uas_1}
+        W_1(\bm{x}) \leq V(t,\bm{x}) \leq W_2(\bm{x})
+    \end{equation}
+    \begin{equation}
+        \label{eq:omega_uas_2}
+        \frac{\partial V}{\partial t} + \left( \frac{\partial V }{\partial \bm{x}}\right)^T \bm{f}(t,\bm{x}) \leq -\alpha(W_1(\bm{x}))
+    \end{equation}
+    for  all $t\geq 0$, $x \in \mathcal{D}$, and some $\alpha \in \mathcal{K}$, with $\mathcal{K}$ being strictly increasing, continuous functions. Then the equilibrium  $\bm{x} = 0$ is UAS if it is $\Omega$-UAS, where $\Omega = \{\bm{x} \in \mathcal{D} | W_1(\bm{x}) = 0\}$.
+\end{theorem}
+
+\ifSubfilesClassLoaded{%
+  \bibliographystyle{\chosenbibstyle}
+  \bibliography{\bibfilename}
+}{}
+
+\end{document}

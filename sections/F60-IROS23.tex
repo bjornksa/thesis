@@ -1,0 +1,545 @@
+% \providecommand{\main}{..}
+\documentclass[../main.tex]{subfiles}
+    Hardware-in-the-loop simulation (HILS) allows a more realistic evaluation of control approaches than what is possible with pure software simulations, but without the actual complexity of the complete system. This is important  for some complex systems such as orbital robots, where testing of the system is typically not possible after its launch, and an on-ground replica is used to validate the performance of such a system. In this article, an impedance-matching approach is presented to match the end-effector dynamics of a fixed-base robot manipulator with that of a target vehicle-manipulator system (VMS), while taking into account the redundant nullspace dynamics in a connected real-time simulation framework. This approach ensures that the forces and torques exerted by the system on the environment matches with that of the simulated system. The contact wrenches used in our approach are not obtained from numerical simulations, but rather from real physical interaction, which is one of the main advantages of our approach. The effectiveness of our method is validated by demonstrating various physical interaction tasks with the environment, using a suspended aerial manipulator as the target system.
+\end{abstract}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Introduction}
+\label{sec:intro}
+Vehicle-manipulator systems (VMS) combine the benefits of traditional fixed-base manipulators (FBM), with the versatility of a mobile base. In some applications such as orbital \cite{mishra2020}, or underwater \cite{antonelli2018} robotics, a mobile base is required to reach the working area. Mobile robots often work in environments that are hazardous or unreachable by humans, besides their widespread use in common industrial and household automation tasks where it is not constrained to a fixed location. Examples include space robotics \cite{flores-abad2014} and underwater intervention \cite{simetti2020}.
+%, and supervised teleoperation in harsh environments such as the particle accelerator at CERN \cite{dicastro2018}.
+
+In many cases, full scale tests of the VMS are prohibitively expensive or practically impossible to perform before the system is put into use. Computer simulations allow initial tests of software and controller design, but are limited in several ways. Such simulations usually are based on simplified models of the system and the environment, which can possibly omit some important information such as the contact dynamics that are hard to model accurately \cite{skrinjar2018}. Additionally, completely numerical simulations do not allow the testing of the components used during the actual experiments. It is therefore common to use hardware-in-the-loop simulations (HILS), where physical components of the actual system are integrated into the simulation \cite{bacic2005, kiesbye2019hardware}. 
+
+HILS has been widely used for several decades, with early works on flight and missile simulations \cite{bacic2005, jung2007modeling}, as well as in the automotive industry \cite{fathy2006}. Testing of robotic systems for use in space is often done using HILS in on-ground testing facilities \cite{piedboeuf1999, artigas2015, mou2018}. Typically, these facilities use a fixed-base manipulator arm to emulate an on-orbit manipulator arm, and a second arm to emulate the environment or a manipulator base. One exception is \cite{mishra2020}, in which a HILS method is developed, using a fixed-base robot to emulate the joint dynamics of a VMS in orbit. This approach uses external forces in the simulation, but cannot interact with the real environment. In \cite{krenn1999limitations}, HILS of a space manipulator arm is accomplished by enforcing a forward kinematics from the simulation onto an industrial robot, while obtaining its sensory feedback and transmitting it back to the simulation. Even though these methods allows physical interaction, it is formulated at the  kinematic level and is validated with a single degree of freedom (DoF) robot. 
+
+%\todo[inline]{Rewrite based on Christian's email, replace citation with Aghili 2003}
+%Motivated by physical interaction tasks, an impedance matching based HILS approach is presented in \cite{aghili1999, aghili2000}. 
+%In \cite{aghili2002}, a method is developed that allows a ground robot to emulate the end-effector dynamics of an orbital manipulator during interaction tasks, using measurements of the contact forces in the real system. The impedance matching approach is shown to be more accurate than a simple position control emulation scheme during contact. 
+
+
+%In \cite{aghili2002}, a method is developed that allows a ground robot to emulate the end-effector dynamics of an orbital manipulator during interaction tasks. The method can simulate a redundant system using numerically simulated nullspace coordinates. Differential algebraic equations with a kinematic constraint are used to develop the impedance matching approach, matching the end-effector positions. However, the method does not allow the use of a redundant emulator system as it relies on the inverse of the manipulator Jacobian. {\color{red} Because a decoupled nullspace projector was not used in \cite{aghili2002}, the nullspace dynamics of the simulated system are dependent on the external forces at the end-effector. The paper is also limited in the fact that the proposed algorithms are only validated in experiments on a  one-DoF manipulator, whereas we have a complete seven-DoF arm.} 
+
+
+In \cite{cetin2022}, an underwater vehicle-manipulator system (UVMS) is emulated by mounting a KUKA IIWA14 robotic manipulator on a Stewart Platform in order to perform physical interactions with the environment. In \cite{aghili2002}, a method is developed that allows a ground robot
+to emulate the end-effector dynamics of an orbital manipulator during interaction tasks. A constraint dynamics formulation is used in their work, whereas our formulation relies on classical impedance control. The proposed solution in \cite{aghili2002} does not allow the use of a redundant fixed-base manipulator as it relies on the inverse of the manipulator Jacobian, which is addressed in our work. Additionally, their proposed solution for a redundant VMS utilizes a kinematic nullspace that is inertially coupled and thus depends on the measured external force. In contrast, our work uses a dynamically consistent nullspace projection, which is independent of the measured external forces. The evaluation of the work in \cite{aghili2002} is done only on a 1-DoF system, whereas our work is validated on a completely redundant 7-DoF arm.
+
+
+%Both these papers are also limited in the fact that the proposed algorithms are only validated in experiments on a manipulator with a single DoF system.
+
+In \cite{cuniato2021hardware},  HILS has been demonstrated for performing physical human-aerial manipulator cooperation, which addresses a similar application as our paper. However, their work relies on a computer simulation of the VMS based on measured forces. An user can interact with the simulated VMS dynamics by means of a haptic display, which is controlled in an admittance mode. Instead, we apply an impedance control approach which is used to implement the end-effector dynamics of the VMS directly onto the FBM. In this way, the FBM displays the correct inertial behavior of the VMS.
+
+%\cite{aghili2000}, \hem{the end-effectors dynamics of two different systems is matched, and tested on a one-DOF arm, while accounting for the interaction forces. It is shown that using impedance matching gives better simulation accuracy than only position tracking during contact with the environment. However, unlike their method, we do not use kinematic constraints that further requires perfectly linearized models. Moreover, we have validated our algorithm on a complex nine-DOF VMS model unlike a single-axis arm used in their study. Besides this, in \cite{aghili2000}, if the disturbances exist in the system, the linearization used will not be exact anymore which further requires modifying the reference model for the controller, which is not the case with our approach}. \par
+This article focuses on utilizing an off-the-shelf FBM to emulate a VMS, matching the end-effector dynamics and interaction forces with the simulated system. The main contributions of this paper can be summarized as the development of a hardware-in-the-loop simulation framework for VMS, based on an impedance-matching framework, that allows interaction with the environment by considering the contact forces. Additionally, redundancy involved with the extra-degrees of freedom is handled by using inertially-decoupled nullspace dynamics, which are simulated in a closed loop with the end-effector dynamics. Our algorithm is generic as it can be applied to match the end-effector dynamics of a given VMS, regardless of its structure and the total DoFs. The proposed framework is validated experimentally by mapping the end-effector dynamics of a 10-DoF suspended aerial manipulator system with that of a 7-DoF Franka Research 3 robot manipulator \cite{haddadin2022}, while successfully demonstrating various physical interaction tasks. The generic nature of our algorithm is demonstrated by considering two different configurations of the VMS.
+
+The paper is organized as follows. In Sec. \ref{sec:dynamics}, some mathematical background and the dynamical models of the systems are presented. In Sec. \ref{sec:impedance_matching}, the proposed method of impedance matching is developed, while the implemented controller is discussed in Sec. \ref{sec:control}. The results from the experimental validation are presented in Sec. \ref{sec:experiments}. Finally, the conclusions and ideas for future work are given in Sec. \ref{sec:conclusions}.
+
+
+\section{End-Effector Dynamics of the Manipulator Systems}
+\label{sec:dynamics}
+In this section, mathematical models of a general FBM and a VMS are presented. Since our approach relies on mapping the end-effector dynamics of the VMS onto that of the FBM, both the models are transformed into Cartesian end-effector coordinates. Mapping of the end-effector dynamics will ensure that real contact forces experienced by the FBM will influence the dynamics of the VMS, and thus allows us to accomplish HILS-based physical interaction with the environment. While the end-effector dynamics of the VMS is aimed to be emulated by the FBM, the remaining degrees of freedom of the VMS must be simulated numerically. Due to the associated noise of acceleration measurements, utilizing them directly in the numeric simulation may severely impact its performance \cite{mishra2020}. Therefore, nullspace coordinates \cite{park1999} are utilized to express the complete system dynamics in an inertially decoupled form, where the nullspace dynamics does not impact the end-effector's acceleration. Moreover, in contrast to \cite{aghili2000}, the nullspace dynamics are unaffected by the contact forces at the end-effector, which is an additional benefit of our approach.
+\subsection{Fixed-base Manipulator}
+The configuration of a fixed-base manipulator (FBM) consists of $n$ revolute or prismatic joints, whose states are described by the vector $\bm{q} \in \mathbb{R}^n$. The dynamics of the system are given as,
+\begin{equation}
+    \label{eq:fixed_base_dynamics}
+    \bm{M}(\bm{q})\bm{\ddot{q}} + \bm{C}(\bm{q}, \dot{\bm{q}})\dot{\bm{q}} + \bm{g}(\bm{q}) = \bm{\tau} + \bm{J}_e^T(\bm{q})\bm{{F}}_{\rm ext},
+\end{equation} 
+where $\bm{M}(\bm{q}) \in \mathbb{R}^{n \times n}$ is the inertia matrix in the joint space, $ \bm{C}(\bm{q}, \dot{\bm{q}})\dot{\bm{q}}  \in \mathbb{R}^{n}$ consists of the Coriolis and centrifugal terms, and $\bm{g}(\bm{q}) \in \mathbb{R}^n$ is the gravitational force acting on the joints. The commanded joint torques are denoted as $\bm{\tau} \in \mathbb{R}^n$ and the external wrench applied at the end-effector as $\bm{{F}}_{\rm ext} \in \mathbb{R}^6$, while the end-effector Jacobian is denoted as $\bm{J}_e \in \bm{\mathbb{R}}^{6 \times n}$ \cite{murray1994}. From this point on, for notational clarity, dependencies of the terms will be omitted.
+The pose of the end-effector is denoted as $\bm{x}_e \in \mathbb{R}^6$, consisting of position and orientation, and its velocity is related to the joint velocities as,
+\begin{equation}
+    \label{eq:ee_velocity_FBM}
+    \dot{\bm{x}}_e = \bm{J}_e\dot{\bm{q}}.
+\end{equation}
+\par The joint space of the FBM may have a higher dimension than the states of the end-effector, (which in our case is 6). Therefore, by considering that the joint space has a dimension $n>6$, a redundancy is involved that is accounted for by defining the nullspace velocity $\bm{v_n} \in \mathbb{R}^{n-6}$, which is related to the joint space using the nullspace Jacobian $\bm{N(q)}$ as follows,
+\begin{equation}
+    \label{eq:N_dynamics}
+   {\bm{v}}_n = \bm{N(q)}\dot{\bm{q}}.
+\end{equation} \par
+The nullspace Jacobian matrix $\bm{N(q)}$ is based on  \cite{park1999} and is chosen as follows,
+%\begin{equation}
+%           \label{eq:nullspace}
+% \bm{Z(q)} = \begin{bmatrix}
+%\left(\bm{-J_m(q)J_r(q)} \right)^T & \bm{I}
+%\end{bmatrix}
+%\end{equation}
+\begin{equation}
+    \label{eq:nullspace}
+    \bm{N(q)} = {\left( \bm{Z(q)M(q)Z(q)^{T}}  \right)}^{-1} \bm{Z(q)M(q)},
+\end{equation} 
+ where the nullspace base matrix $\bm{Z}$ can be chosen using different techniques \cite{chen1993consistent} to satisfy
+\begin{equation}
+    \label{eq:nullspace_dyn_consistency}
+    \bm{J_e(q)Z(q)^T} = \bm{0}.
+\end{equation} \par 
+Eq. \eqref{eq:nullspace} ensures an inertial decoupling between the end-effector and nullspace dynamics \cite{park1999}. The nullspace velocities $\bm{v}_n$ and their integrals do not correspond to a physical quantity of the system, but are rather used to describe the redundant motion of the system. Combining the end-effector and the nullspace velocity, the new velocity vector $\dot{\bm{x}}$ and augmented Jacobian $\bm{J}$ of the FBM are expressed as follows,
+\begin{equation}
+    \label{eq:Jac}
+   \dot{\bm{x}}= \begin{bmatrix}
+\dot{\bm{x}}_e\\
+\bm{v}_n
+\end{bmatrix} = \begin{bmatrix}
+\bm{J}_e\\
+\bm{N}
+\end{bmatrix}  \dot{\bm{q}} =
+{\bm{J}}
+\dot{\bm{q}}.
+\end{equation} \par
+
+We consider that the commanded torque ${\bm{\tau}}$ compensates for the effect of gravity, leading us to the effective commanded torque ${\bm{\tau}} =  {\bm{\tau}'} + \bm{g}$. To analyze the effect of the control torque in the end-effector and nullspace coordinates, we can define the torque $\bm{\tau}'$ as a function of a desired end-effector control force $\bm{F}_e$ and nullspace control force $\bm{F}_n$. Specifically, we can express $\bm{\tau}' = \bm{J}_e^T\bm{F}_e + \bm{N}^T \bm{F}_n$ and $\bm{F} = \begin{bmatrix} \bm{F}_e^T & \bm{F}_n^T\end{bmatrix}^T$. The design of the control forces is done in Sec. \ref{sec:control}. Next, differentiating  \eqref{eq:Jac} and utilizing \eqref{eq:fixed_base_dynamics}, the end-effector and nullspace dynamics are found as follows,
+% The effective commanded torque ${\bm{\tau}}'$ is then utilized to utilized in Eq. \eqref{eq:fixed_base_ee} to obtain the inertia matrix $\bm{\Lambda}$ and coriolis matrix $\bm{\mu}$ of the end-effector dynamics.
+%\begin{equation}
+%    \label{eq:dyn_ee_1}
+%    \begin{aligned}
+%   \ddot{\bm{x}}
+%    &= \bm{J} \bm{M}^{-1}\left(\bm{\tau}' + \bm{J}_e^T\bm{{F}}_{\rm ext}  -  \bm{C}\dot{\bm{q}}  \right)
+%    +\dot{\bm{J}} \dot{\bm{q}}
+%    \end{aligned}
+%\end{equation} \par
+%Using the Jacobian, we can express the torque $\bm{\tau}'$ as a function of a desired end-effector control force $\bm{F}_e$ and nullspace control force $\bm{F}_n$. We define $\bm{\tau}' = \bm{J}_e^T\bm{F}_e + \bm{N}^T \bm{F}_n$ and $\bm{F} = \begin{bmatrix} \bm{F}_e^T & \bm{F}_n^T\end{bmatrix}^T$, giving us,
+% The torques $\bm{\tau}'$ and $\bm{\tau}_{\rm ext}$ acting on the joints can be expressed as the respective forces  $\bm{F}'$ and  $\bm{F}_{\rm ext}$ acting on the state $\bm{x}$ using the jacobian $\bm{J}$, i.e. $\bm{F}' = \bm{J}^{T}\dot{\bm{q}} $ and $\bm{F}_{\rm ext} = \bm{J}^{T}\dot{\bm{q}}$. Utilizing it in  Eq. \ref{eq:dyn_ee_1}, we obtain the following relation.
+\begin{equation}
+    \label{eq:dyn_ee_2}
+   \ddot{\bm{x}}
+    = \bm{J} \bm{M}^{-1}\bm{J}^{T} \bm{F}
+    + \bm{J} \bm{M}^{-1}\bm{J}_e^{T}\bm{{F}}_{\rm ext}  -  \bm{J} \bm{M}^{-1}\bm{C}\dot{\bm{q}}
+    +\dot{\bm{J}} \dot{\bm{q}}.
+\end{equation} \par
+A task inertia matrix is defined as $\bm{\Lambda} = (\bm{J} \bm{M}^{-1}\bm{J^{T}})^{-1}$, and a task Coriolis matrix as $\bm{\mu}= \bm{\Lambda} \bm{J} \bm{M}^{-1}\bm{C}\bm{J}^{-1}-\bm{\Lambda} \dot{\bm{J}} \bm{J}^{-1} $. Utilizing these definitions, Eq. \eqref{eq:dyn_ee_2} is reformulated as follows,
+%\begin{equation}
+%    \label{eq:dyn_ee_3}
+%    \bm{\Lambda}  \ddot{\bm{x}} + \bm{\mu} \dot{\bm{x}}= \bm{F}
+%    + \begin{bmatrix}
+%        \bm{I}_{6 \times 6} \\ \bm{0}_{(n-6) \times 6}
+%    \end{bmatrix}\bm{\mathcal{F}}_{\rm ext}
+    %&\bm{\Lambda}  \ddot{\bm{x}}
+    % = \left(\bm{F} + \bm{\mathcal{F}}_{\rm ext}  \right)
+    % +\bm{\Lambda} \dot{\bm{J}} \bm{J}^{-1} \dot{\bm{x}} \\
+%\end{equation} \par
+\begin{equation}
+    \label{eq:dyn_decop}
+    \resizebox{0.9\hsize}{!}{
+    $
+    \underbrace{\begin{bmatrix}
+        \bm{\Lambda_e} & 0 \\
+        0 & \bm{\Lambda_n}
+    \end{bmatrix}}_{ \bm{\Lambda}}
+    \begin{bmatrix}
+        \bm{\Ddot{x}_e} \\
+        \bm{\dot{v}_n}
+    \end{bmatrix} +
+    \underbrace{\begin{bmatrix}
+        \bm{\mu_e} & \bm{\mu_{en}} \\
+        \bm{\mu_{ne}} & \bm{\mu_{n}}
+    \end{bmatrix}}_{\bm{\mu}}
+    \begin{bmatrix}
+        \bm{\dot{x}_e} \\
+        \bm{{v_n}}
+    \end{bmatrix} = \begin{bmatrix}
+        \bm{F_e} + \bm{{F}}_{\rm ext}\\
+        \bm{F_n}
+    \end{bmatrix}$}.
+\end{equation} \par
+The block diagonal structure of $\bm{\Lambda}$, and the fact that the task forces only affect the end-effector coordinates, are because of the particular choice of the dynamically consistent nullspace Jacobian $\bm{N}$. Additionally, the external force at the end-effector,  $\bm{F_{ext}}$, does not affect the nullspace dynamics. Note that there is still a coupling between the coordinates at the velocity level due to the Coriolis matrix $\bm{\mu}$.
+
+\subsection{Vehicle-Manipulator System}
+We consider a VMS consisting of a mobile base with a  manipulator arm attached to it. Throughout the paper, quantities with a hat operator ($\hat{.}$) refer to the VMS. The system state can be described by a vector $\hat{\bm{\eta}} \in \mathbb{R}^{\hat{m} + \hat{n}}$, where $\hat{m}$ is the number of DoFs of the system base, and $\hat{n}$ is the number of manipulator joints. For a floating base in $SE(3)$, we have $\hat{m}=6$. A vector of quasi-velocities $\hat{\bm{\nu}} \in \mathbb{R}^{\hat{m}+\hat{n}}$ is also defined, containing the base velocity vector $\hat{\bm{v}}_b \in \mathbb{R}^{\hat{m}}$ and the joint velocities $\dot{\hat{\bm{q}}} \in \mathbb{R}^{\hat{n}}$ such that
+\begin{equation}
+    \hat{\bm{\eta}} =
+    \begin{bmatrix}
+        \hat{\bm{x}}_b^T & \hat{\bm{q}}^T
+    \end{bmatrix}^T
+    \quad
+    \hat{\bm{\nu}} =
+    \begin{bmatrix}
+       \hat{\bm{v}}_b^T & \dot{\hat{\bm{q}}}^T
+    \end{bmatrix}^T.
+\end{equation} \par
+
+The dynamics of the system can be described as follows,
+\begin{equation}
+    \label{eq:VMS_dynamics}
+        \hat{\bm{M}}(\hat{\bm{q}})\dot{\hat{\bm{\nu}}}
+        + \hat{\bm{C}}(\hat{\bm{q}}, \hat{\bm{\nu}})\hat{\bm{\nu}}
+        + \hat{\bm{g}}(\hat{\bm{\eta}})
+        = \hat{\bm{\tau}} + \hat{\bm{J}}_{e}^T \hat{\bm{{F}}}_{\rm ext}.
+\end{equation} \par
+Here it is assumed that the external forces only affect the end-effector of the system. The matrix $\hat{\bm{M}} \in \mathbb{R}^{(\hat{m}+\hat{n}) \times (\hat{m}+\hat{n})}$ is the inertia matrix, $\hat{\bm{C}} \in \mathbb{R}^{(\hat{m}+\hat{n}) \times (\hat{m}+\hat{n})}$ is the Coriolis and centrifugal matrix, and $\hat{\bm{g}} \in \mathbb{R}^{(\hat{m}+\hat{n})}$ is the vector of potential forces (gravity). The control input is given by $\hat{\bm{\tau}} \in \mathbb{R}^{\hat{m} + \hat{n}}$. The Jacobian matrix $\hat{\bm{J}}_{e} \in \mathbb{R}^{6 \times (\hat{m}+\hat{n})}$ is the end-effector Jacobian. Finally, $\hat{\bm{{F}}}_{\rm ext} \in \mathbb{R}^{6}$ are the external forces and torques acting at the end-effector.
+%\begin{equation}
+%    \label{eq:VMS_ee}
+%    \ddot{\hat{\bm{x}}}_e
+%    = \hat{\bm{J}_e} \hat{\bm{M}}^{-1}\left(\hat{\bm{\tau}} + \hat{\bm{J}_e}^T(\hat{\bm{q}})\hat{\bm{\mathcal{F}}}_{\rm ext} -  \hat{\bm{C}}\dot{\hat{\bm{q}}} - \hat{\bm{g}} \right)
+%    +\dot{\hat{\bm{J}}} \dot{\hat{\bm{q}}}
+%\end{equation} \par
+ When $\hat{m} + \hat{n} > 6$, the system is redundant, and the end-effector coordinates are not sufficient to describe the full system state. Therefore, the nullspace velocities of the VMS are developed similarly to \eqref{eq:nullspace}, giving the augmented Jacobian as,
+\begin{equation}
+    \hat{\bm{J}} = \begin{bmatrix}
+        \hat{\bm{J}}_e^T & \hat{\bm{N}}^T
+    \end{bmatrix}^T.
+\end{equation} \par
+Next, defining the task inertia matrix $\hat{\bm{\Lambda}} = (\hat{\bm{J}}\hat{\bm{M}}^{-1}\hat{\bm{J}}^T)^{-1}$, the task Coriolis matrix $\hat{\bm{\mu}} = \hat{\bm{\Lambda}} \left( \hat{\bm{J}} \hat{\bm{M}}^{-1}\hat{\bm{C}} - \dot{\hat{\bm{J}}}\right)\hat{\bm{J}}^{-1}$, and the task gravity vector $\hat{\bm{\rho}} = \hat{\bm{\Lambda}} \hat{\bm{J}} \hat{\bm{M}}^{-1} \hat{\bm{g}} $ allows us to write the dynamics in end-effector and nullspace velocity coordinates as,
+\begin{equation}
+\label{eq:dyn_decop_vms}
+\resizebox{1\hsize}{!}{
+    $\begin{bmatrix}
+        \hat{\bm{\Lambda}}_e & 0 \\
+        0 & \hat{\bm{\Lambda}}_n
+    \end{bmatrix}\begin{bmatrix}
+        \ddot{\hat{\bm{x}}}_e \\
+        \dot{\hat{\bm{v}}}_n
+    \end{bmatrix} +
+    \begin{bmatrix}
+        \hat{\bm{\mu}}_e & \hat{\bm{\mu}}_{en} \\
+        \hat{\bm{\mu}}_{ne} & \hat{\bm{\mu}}_{n}
+    \end{bmatrix}\begin{bmatrix}
+        \dot{\hat{\bm{x}}}_e \\
+        \hat{\bm{v}}_n
+    \end{bmatrix} + \begin{bmatrix}
+        \hat{\bm{\rho}}_e \\
+        \hat{\bm{\rho}}_n
+    \end{bmatrix}= \begin{bmatrix}
+        \hat{\bm{F_e}} + \hat{\bm{F}}_{\rm ext}\\
+        \hat{\bm{F_n}}
+    \end{bmatrix}$.
+}
+\end{equation} \par
+%with control forces given by $\hat{\bm{F}}_e = \hat{\bm{J}}_e \hat{\bm{\tau}}$, and $\hat{\bm{F}}_n = \hat{\bm{N}} \hat{\bm{\tau}}$. // TODO: Double check this
+\section{Impedance Matching Strategy}
+\label{sec:impedance_matching}
+\begin{figure}[ht]
+    \centering\includegraphics[width=0.475\textwidth]{figures/IROS23/block_diagram/HILS_block_final_2.png}
+    \caption{Block diagram of our proposed HILS approach}
+    \label{fig:block_diagram}
+\end{figure}
+In this section, we develop the proposed method of impedance matching, whose goal is to map the end-effector dynamics of the VMS \eqref{eq:VMS_ee_dynamics} to the end-effector dynamics of the FBM \eqref{eq:dyn_decop}, since a main focus of this work is to achieve realistic contact dynamics between the end-effector and the environment. To this end, the applied control force at the end-effector of the HILS-manipulator should cancel its end-effector dynamics, and insert the corresponding dynamics of the VMS.  A block diagram of our proposed approach is shown in Fig. \ref{fig:block_diagram}. The control force is chosen as
+\begin{equation}
+    \bm{F}_e = \bm{\Lambda}_e \ddot{\hat{\bm{x}}}_e
+    + \bm{\mu}_e \dot{\bm{x}}_e + \bm{\mu}_{en} \bm{v}_n 
+    - \bm{F}_{\rm ext},
+\end{equation}
+which by \eqref{eq:dyn_decop} leads to the FBM end-effector acceleration as,
+\begin{equation}
+    \label{imp_match}
+    \ddot{{\bm{x}}}_e = \ddot{\hat{\bm{x}}}_e.
+\end{equation} \par
+The VMS dynamics derived in \eqref{eq:dyn_decop_vms} has the same inertially decoupled structure as the coordinates used in \cite{garofalo2015}, allowing us to express the dynamics of the VMS end-effector as,
+\begin{equation}
+    \label{eq:VMS_ee_dynamics}
+    \ddot{\hat{\bm{x}}}_e =
+    \hat{\bm{\Lambda}}_e^{-1} \left(
+        \hat{\bm{F}}_e + \hat{\bm{F}}_{\rm ext} - \hat{\bm{\rho}}_e
+        - \hat{\bm{\mu}}_e \dot{\hat{\bm{x}}}_e
+        - \hat{\bm{\mu}}_{en} \hat{\bm{v}}_n
+    \right),
+\end{equation} 
+which does not rely on the nullspace accelerations. Equivalently, the nullspace dynamics are given as,
+\begin{equation}
+    \label{eq:VMS_null_dynamics}
+    \dot{\hat{\bm{v}}}_n =
+    \hat{\bm{\Lambda}}_n^{-1} \left(
+        \hat{\bm{F}}_n - \hat{\bm{\rho}}_n
+        - \hat{\bm{\mu}}_{n} \hat{\bm{v}}_n
+        - \hat{\bm{\mu}}_{en} \dot{\hat{\bm{x}}}_e
+    \right).
+\end{equation} \par
+In order to match the interaction forces, we set $\hat{\bm{{F}}}_{\rm ext} = \bm{{F}}_{\rm ext}$, thus utilizing the physical contact of the HILS system which is then inserted into the VMS dynamics \eqref{eq:VMS_ee_dynamics}, giving the total manipulator end-effector control force as,
+\begin{equation}
+    \begin{aligned}
+    \label{eq:Fe}
+    \bm{F}_e = \bm{\mu}_e \dot{\bm{x}}_e & + \bm{\mu}_{en} \bm{v}_n + \left(\bm{\Lambda}\hat{\bm{\Lambda}}_e^{-1} - \bm{I}\right)
+    \bm{{F}}_{\rm ext} \\
+    + & \bm{\Lambda} \hat{\bm{\Lambda}}_e^{-1}\left(
+        \hat{\bm{F}}_e
+        - \hat{\bm{\mu}}_e \dot{\hat{\bm{x}}}_e
+        - \hat{\bm{\mu}}_{en} \hat{\bm{v}}_n
+        - \hat{\bm{\rho}}_e
+    \right).
+    \end{aligned}
+\end{equation} \par 
+As our main goal is controlling the fixed-base system using impedance-matching of the end-effector, the nullspace control law is less vital. We propose a simple nullspace damping approach as follows,
+\begin{equation}
+    \label{eq:control_null}
+    \bm{F}_n = {\bm{\mu}}_{ne} \dot{{\bm{x}}}_e -\bm{D}_n \bm{v}_n,
+\end{equation}
+ where $\bm{D}_n = \bm{D}_n^T > \bm{0}$ is a damping gain matrix to be chosen. The nullspace controller cancels out the Coriolis terms related to the end-effector ${\bm{\mu}}_{ne}$, while preserving the nullspace Coriolis ${\bm{\mu}}_{n} {\bm{v}}_n$, in order to compensate the effects of the VMS end-effector motion on the manipulator nullspace dynamics. Note that our impedance matching approach is not affected by the damping controller designed for the nullspace dynamics. The impedance matching strategy ensures that the dynamics of the FBM matches that of the VMS end-effector dynamics, and therefore we do not have to separately simulate the end-effector dynamics of the VMS \eqref{eq:VMS_ee_dynamics}.  However, the nullspace dynamics of the VMS \eqref{eq:VMS_null_dynamics} are simulated to obtain its nullspace velocity $\hat{\bm{v}}_n$. 
+% The end effector and nullspace velocities $\dot{\hat{\bm{x}}}_e$ of the VMS are obtained from measurements of the manipulator velocities, setting $\dot{\hat{\bm{x}}}_e = \dot{\bm{x}}_e$ at every timestep. The nullspace velocities $\hat{\bm{v}}_n$ are obtained from numerical simulation of \eqref{eq:VMS_null_dynamics}.
+%{\color{red}
+%Along with the inverse Jacobian, these can be used to reconstruct the joint and base velocities of the VMS as follows,}
+  The inverse Jacobian is then used to reconstruct the joint and base velocities of the VMS as follows,
+\begin{equation}
+    \label{eq:recons}
+    \hat{\bm{\nu}} =  \hat{\bm{J}}^{-1} \begin{bmatrix}
+        \dot{\hat{\bm{x}}}_e^T &  \hat{\bm{{v}}}_n^T
+    \end{bmatrix}^{\bm{T}}.
+\end{equation} \par 
+These velocities could then be integrated to obtain the joint and base positions $\hat{\bm{\eta}}$. The numerical integration will however inherently lead to drift.
+% The developed impedance matching strategy guarantees that the end-effector accelerations $\Ddot{\hat{\bm{x}}}_e$ and $\Ddot{\bm{x}}_e$ of the VMS and fixed-base manipulator match with each other. However, this does not guarantee that their respective positions ${\hat{\bm{x}}}_e$ and ${\bm{x}}_e$ will match due to numerical errors from the integration.
+Therefore, instead of using the measurements of the manipulator end-effector velocities directly, we propose a drift compensation strategy as follows,
+
+\begin{equation}
+    \label{eq:drift}
+    \dot{\hat{\bm{x}}}_e =  \dot{{\bm{x}}}_e + \bm{K_{dr}} \left(
+\left( \hat{\bm{x}}_e - \hat{\bm{x}}_{e0} \right) - \left( {\bm{x}}_e - {\bm{x}}_{e0} \right) \right),
+\end{equation} 
+where $\hat{\bm{x}}_{e0}$ and ${\bm{x}}_{e0}$ are the initial end-effector position of the VMS and FBM, respectively, and $\bm{K_{dr}}$ is the drift coefficient. Eq. \eqref{eq:drift} will ensure that the velocity and the position of the VMS end-effector will maintain its fixed initial offset with respect to the corresponding FBM variables, and thus compensate for the drift resulting from  numerical integration.
+% Finally, once $\dot{\hat{\bm{x}}}_e$ and $\hat{\bm{v}}_n$ are known, the inverse Jacobian is used to reconstruct the joints velocities of the VMS as follows,
+% \begin{equation}
+%     \label{eq:recons}
+%     \dot{\hat{\bm{q}}} =  \hat{\bm{J}}^{-1} \begin{bmatrix}
+% \dot{\hat{\bm{x}}}_e^T &  \hat{\bm{{v}}}_n^T
+% \end{bmatrix}^{\bm{T}}.
+% \end{equation}
+% Next, utilizing Eqs. \eqref{eq:dyn_decop} and  \eqref{eq:dyn_decop_vms} in Eq. \eqref{imp_match}, the following expression is obtained.
+% \begin{equation}
+% \begin{aligned}
+%     \label{imp_match_eqn}
+%       &  {{\bm{\Lambda}}_e}^{-1} \left(
+%  \bm{F_e} + \bm{F_{e,ext}} - {\bm{\nu}}_e \dot{{\bm{x}}}_e   - {\bm{\nu}}_{en}
+% {\bm{{V_n}}} \right)  =  \\                   &{\hat{\bm{\Lambda}}_e}^{-1} \left(
+%  \hat{\bm{F}_e} + \hat{\bm{F}}_{e,ext} - {\hat{\bm{\nu}}}_e \dot{\hat{\bm{x}}}_e   - {\hat{\bm{\nu}}}_{en}
+% {\hat{\bm{{V}}}}_n \right) \\
+% & \Rightarrow
+%       \bm{F_e} =
+%     {\bm{\nu}}_e \dot{{\bm{x}}}_e   +  {\bm{\nu}}_{en}
+% {\bm{{V_n}}} - \bm{F_{e,ext}}  + \\                   &{{\bm{\Lambda}}_e}{\hat{\bm{\Lambda}}_e}^{-1} \left(
+%  \hat{\bm{F}_e} + \hat{\bm{F}}_{e,ext} - {\hat{\bm{\nu}}}_e \dot{\hat{\bm{x}}}_e   - {\hat{\bm{\nu}}}_{en}
+% {\hat{\bm{{V}}}}_n \right)
+% \end{aligned}
+% \end{equation}
+% From Eq. \eqref{imp_match_eqn}, we obtain a expression for the commanded end-effector force on the fixed-base manipulator as a function of the end-effector forces on the VMS.  The underlying assumption of the Hardware in the loop Simulation (HILS) is that the end-effector external forces acting on the VMS system  $\hat{\bm{F}}_{e,ext}$ are the same as the ones experienced by fixed-base system ${\bm{F}}_{e,ext}$. \todo[inline]{Write more about the above control law}
+
+
+\section{Control Approach for the VMS}
+\label{sec:control}
+%{\color{red}
+%As the proposed HILS scheme is independent of the VMS controller, any approach may be chosen. The controller may be designed either in the joint space \eqref{eq:VMS_dynamics}, or in the end-effector and nullspace coordinates \eqref{eq:dyn_decop_vms}.
+%}
+The proposed HILS scheme is independent of the VMS controller, and therefore any control approach can be chosen for the VMS. The controller may be designed either in the joint space \eqref{eq:VMS_dynamics}, or in the end-effector and nullspace coordinates \eqref{eq:dyn_decop_vms}.
+% A joint-space control input $\bm{\hat{\tau}}$ can be designed for the VMS based on MPC \cite{ott2022experimental}, adaptive \cite{mobayen2021finite} or other control techniques, which can then be transformed into a decoupled end-effector and nullspace forces using the following relation,
+%A joint-space control input can be transformed into decoupled end-effector and nullspace forces using the following relation
+For a joint-space controller, the control input needs to be transformed into decoupled end-effector and nullspace forces using the following relation,
+\begin{equation}
+    \begin{bmatrix}
+\hat{\bm{F}}_e^{\bm{T}} & \hat{\bm{F}}_n^{\bm{T}}
+\end{bmatrix}^{\bm{T}} =
+\begin{bmatrix}\hat{\bm{J}}_e^{\bm{T}} & \hat{\bm{N}}^{\bm{T}}
+\end{bmatrix}^{\bm{-1}}
+\bm{\hat{\tau}}.
+\end{equation} \par 
+%to be used in the manipulator end-effector controller \eqref{eq:Fe}.
+However, in this study, we designed a decoupled control input for the end-effector and the nullspace dynamics. We choose a PD+ control approach\cite{paden1988} for the end-effector as this is one of the most well-established control approaches.
+%We choose a PD+ control approach \cite{paden1988} for the end-effector as it is well established 
+%and requires minimal tuning. 
+Specifically, the VMS end-effector control input is chosen as
+\begin{equation}
+\label{eq:vms_control}
+\resizebox{0.8\hsize}{!}{$\begin{aligned}
+\hat{\bm{F}_e} = & \hat{\bm{\Lambda}}_e \ddot{\hat{\bm{x}}}_{e,d} + {\hat{\bm{\mu}}}_{e}  \dot{\hat{\bm{x}}}_{e,d}    + {\hat{\bm{\mu}}}_{en}
+\hat{\bm{v}}_n + \hat{\bm{\rho}}_e + \\
+& \bm{K_D}\left( \dot{\hat{\bm{x}}}_{e,d} - \dot{\hat{\bm{x}}}_e \right) + \bm{K_P} \left(  {\hat{\bm{x}}}_{e,d} - {\hat{\bm{x}}}_e \right),
+\end{aligned}$}
+\end{equation}
+where the desired end-effector velocity and position are denoted by $\dot{\hat{\bm{x}}}_{e,d}$  and ${\hat{\bm{x}}}_{e,d}$ respectively. The nullspace controller for the VMS is chosen similar to \eqref{eq:control_null} as,
+\begin{equation}
+    \label{eq:control_null_vms}
+    \hat{\bm{F}}_n = \hat{\bm{\mu}}_{ne} \dot{\hat{{{\bm{x}}}}}_e
+    - \hat{\bm{D}}_n \hat{\bm{v}}_n
+    + \hat{\bm{\rho}}_n.
+\end{equation}
+%\sout{Next, utilizing the VMS control law of Eq. \eqref{eq:vms_control} in impedance matching of \eqref {eq:Fe}, we obtain the simplified fixed-base control law as,}
+%{\color{red}
+%\begin{equation}
+%\begin{aligned}
+%\label{eq:fixed_base_control}
+%    \bm{F_e} = & -{\bm{\nu}}_e \dot{{\bm{x}}}_e   -  {\bm{\nu}}_{en}
+%{\bm{{V_n}}}+ \left(\bm{\Lambda}\hat{\bm{\Lambda}}_e^{-1} - %\bm{I}\right)\bm{\mathcal{F}}_{\rm ext} +
+%      {{\bm{\Lambda}}_e}{\hat{\bm{\Lambda}}_e}^{-1} \\ %&\left(\hat{\bm{\Lambda}}_e \ddot{\hat{\bm{x}}}_d + \left( %\hat{\bm{\nu}}_e +\bm{K_D}
+% \right) \left( \dot{\hat{\bm{x}}}_{e,d} - \dot{\hat{\bm{x}}}_e \right) + \bm{K_P} \left(  {\hat{\bm{x}}}_{e,d} - {\hat{\bm{x}}}_e \right) \right)
+%\end{aligned}
+%\end{equation} \par}
+%A stable closed-loop controlled system dynamics is obtained by applying the control law in Eq. \eqref{eq:fixed_base_control} as, \hem{Effect of Fe on stability ?}
+%\begin{equation}
+%    \label{eq:fr3}
+%    \begin{aligned}
+%    {\hat{\bm{\Lambda}}_e}\left(  \Ddot{{\bm{x}}}_{e,d} -%\Ddot{{\bm{x}}}_e \right) + & \left( \hat{\bm{\nu}}_e +\bm{K_D}
+% \right)\left( \dot{\hat{\bm{x}}}_{e,d}  -
+%    \dot{\hat{\bm{x}}}_e \right) - \\
+%    & \bm{K_P} \left(  {\hat{\bm{x}}}_{e,d} - {\hat{\bm{x}}}_e \right) %- {\bm{F}}_{e} = 0
+%        \end{aligned}
+%\end{equation}
+\section{Experimental Validation}
+\label{sec:experiments}
+%\begin{figure}[t]
+%    \centering
+%%    \caption{Franka Research 3 (FR3) used as the fixed-base Manipulator for our experimental validation. The end-effector is fitted with a pointed tip (marked in red) for physical interaction task.}
+%    \label{fig:franka}
+%\end{figure}
+\begin{figure}[t]
+    \centering
+    \includegraphics[scale=0.1075]{figures/IROS23/axis_2.png}
+    \caption{Two different configurations of the simulated VMS, which consists of a 3-DoF base and a 7-DoF robotic arm. Configuration 1 (on the left) has the robotic arm mounted in an upright position, while configuration 2 (on the right) has the arm mounted in an inverted position. The VMS is suspended using stiff ropes from a crane. The three axes of rotation of the base are also shown in the figure.}
+    \label{fig:vms}
+\end{figure}
+In order to validate our proposed approach for the hardware-in-the-loop simulations, the Franka Research 3 manipulator \cite{haddadin2022} is used, which consists of seven torque-controlled rotational joints. The end-effector of the Franka robot is fitted with a pointed tip for physical interaction tasks. The Franka was interfaced using the Simulink interface \cite{haddadin2022} provided by the manufacturer, running at 1000 Hz. The VMS considered for this study is similar to the SAM platform \cite{sarkisov2019}, which consists of a fully-actuated suspended base with six degrees of freedom, and a seven degrees of freedom KUKA robotic arm attached underneath it.
+
+The simulated VMS system (Fig. \ref{fig:vms}) consists of a movable base that is suspended from a crane using a stiff rope of length 3 m. The base consists of three actuation units, which are the rotation of the rope about its hanging point, along the $x$-, $y$- and $z$-axis of the inertial frame. Three joint angles of the VMS-base are used to express the rotation about the three different axes. This gives a total of 10 DoF, so that the entire system state can be described by $\hat{\bm{q}} \in \mathbb{R}^{10}$, where $\hat{q}_1, \hat{q}_2$ and $\hat{q}_3$ describe the base rotation around the $x$-, $y$-, and $z$-axis respectively. The base of the VMS is assumed to be a rigid disk of mass 10 kg with a Franka manipulator attached to it. We validated our approach using two different configurations of the VMS, which are the upright and the inverted mounting of the manipulator to the base of the VMS. The initial joint angles for the FBM are chosen as ${0}$, $-{\pi /4}$, ${0}$, $-{3\pi /4}$, $-{\pi /2}$ , ${\pi /2}$ and ${0}$ radians, which correspond to the end-effector pointing vertically downwards, which is necessary for the physical interaction task in our work. The manipulator of the VMS has the same initial configuration as the FBM, whereas its base is placed perpendicular to the $z$-axis of the global frame by commanding its three joint angles as 0 radians.
+The stiffness and damping gains of the VMS controller are chosen based on their initial VMS end-effector inertia, and are summarized in Table \ref{table:coeff}.
+For the sake of simplicity, the nullspace gains are chosen as the identity matrix. The proportional components in our controller corresponding to the orientation errors are calculated  using relative Euler angles  instead of absolute Euler angles, in order to mitigate singularity issues \cite{caccavale1999six}. 
+
+Besides this, the external contact forces experienced by the FBM end-effector are calculated using an internal nonlinear disturbance observer \cite{haddadin2022}, rather than using an external force-torque sensor. A second-order low-pass filter with a cut-off frequency of 10 Hz is used to attenuate the noise from the estimator.
+\begin{table}[h!]
+  \centering
+   \caption[Controller Coefficients]{\centering Controller Coefficients}
+    \label{table:coeff}
+\begin{tabular}{|c||c|c|c|c|c|c|}
+\hline
+ & $x$ & $y$ & $z$ & $\phi$ & $\theta$ & $\psi$\\
+\hline
+\hline
+$\bm{K_P}$& 500 & 206 & 278 & 21.5 & 61.5 & 73.5\\
+\hline
+$\bm{K_D}$  & 30.3 & 20.1 & 23.3 & 6.5 & 11 & 12 \\
+\hline
+\end{tabular}
+\end{table}
+
+
+\par
+%For the sake of simplicity in the controller implementation,  while deriving the VMS and fixed-base manipulator control laws \eqref{eq:vms_control} and \eqref{eq:fixed_base_control}, the coriolis terms $\hat{\bm{C}}$  and  ${\bm{C}}$ are cancelled beforehand using the respective control torque control inputs $\hat{\bm{\tau}}$ and ${\bm{\tau}}$. Furthermore, the gravity compensation of the VMS is done prior to the control formulation by cancelling the term $\hat{\bm{g}}$ using the torque $\hat{\bm{\tau}}$.
+
+
+\par The experimental validation is accomplished using three different scenarios. In the first scenario, a trajectory tracking task is given to the end-effector of the VMS, and then in the second scenaio, the end-effector is commanded to maintain a fixed position provided as its setpoint, in the presence of external disturbances. Finally in the third scenario, we consider physical interaction, where the end-effector interacts compliantly with the environment, and the corresponding effects in the VMS are analyzed. 
+%\cor{The first scenario is validated with both configuration of the VMS, in order to demonstrate the generic nature of our approach. However, only configuration 1 of the VMS was used to validate the second and third scenario, even though the performances of both the configurations were found to be similar which is not shown in the paper. }
+For the first scenario, both configurations of the VMS are tested, while only configuration 1 is shown for the second and third scenarios, as the performance was found to be similar for both configurations.
+\subsection{Trajectory Tracking}
+\begin{comment}
+\begin{figure}[h]
+\begin{subfigure}{0.5\textwidth}
+  \centering
+  % include first image
+  \includegraphics[scale=0.325]{figures/IROS23/Track_EE_new.eps}
+  \caption{Tracking using configuration 1}
+  \label{fig:ee_track_1}
+\end{subfigure}
+\begin{subfigure}{0.5\textwidth}
+  \centering
+  % include second image
+  \includegraphics[scale=0.37]{figures/IROS23/Track_EE_2_new.eps}
+  \caption{Tracking using configuration 2}
+  \label{fig:ee_track_2}
+\end{subfigure}
+\caption{End-effector position comparison along the $x-$ and $z-$ axis of the FBM and the VMS for the  trajectory tracking task, utilizing the two configurations.}
+\label{fig:ee_track}
+\end{figure}
+\end{comment}
+
+\begin{figure}[b]
+\begin{subfigure}{\linewidth}
+  \centering
+  % include first image
+  \includegraphics[width=\linewidth]{figures/IROS23/Track_Errors_newest.eps}
+  \caption{Error of configuration 1}
+  \label{fig:ee_track_1}
+\end{subfigure}
+\begin{subfigure}{\linewidth}
+  \centering
+  % include second image
+  \includegraphics[width=\linewidth]{figures/IROS23/Track_Errors_2_new.eps}
+  \caption{Error of configuration 2}
+  \label{fig:ee_track_2}
+\end{subfigure}
+\caption{Errors between the reference $\bm{\hat{x}_{e,d}}$ and the  end-effector pose $\bm{\hat{x}_{e}}$ of the two configurations of the VMS, for the trajectory tracking task. }
+ \label{fig:ee_track_error}
+%\label{fig:ee_track}
+\end{figure}
+
+\begin{comment}
+\begin{figure}[t]
+    \centering
+    \includegraphics[scale=0.32]{figures/IROS23/Track_Errors_new_mod.eps}
+    \caption{Errors between the reference $\bm{\hat{x}_{e,d}}$ and the  end-effector pose $\bm{\hat{x}_{e}}$ of the VMS, for the given trajectory tracking task, for Configuration 1 of the VMS. }
+    \label{fig:ee_track_error}
+\end{figure} \par
+\end{comment}
+For the trajectory tracking task, a sinusoidal signal of amplitude 0.15 m and a frequency of 0.6 rad/s is provided as the reference for the $x$- and $z$-axis position, represented in the global coordinate frame. The end-effector position along the $y$-axis and its orientation  are commanded to remain in their initial configurations. The results of the tracking task for the $x$-axis and $z$-axis are shown in Fig. \ref{fig:ee_track_1} for configuration 1 of the VMS, and in Fig. \ref{fig:ee_track_2} for configuration 2. These plots show that the PD+ controller in \eqref{eq:vms_control} allows the VMS end-effector to successfully track the given reference trajectory, with a tracking error of less than 0.1 m for the position and 0.1 rad for the orientation  (Fig. \ref{fig:ee_track_error}). A possible source of this error is the use of a force estimator at the end-effector instead of a physical sensor, due to which the bias and noises from the estimator gets reflected in the control signals. These errors can be reduced by an effective tuning or potentially be eliminated by the use of integral action in the controller, which is not addressed in this paper. We also observe that the rotational error about the $y$-axis ($\theta$) is similar to that of the translational $x$- and $z$- axis errors, due to the coupling of these axes in the end-effector dynamics. 
+
+\begin{comment}
+    
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=\linewidth]{figures/IROS23/Track_Joints_newest.eps}
+    \caption
+{The joint angles of the FBM (upper plot) and the VMS in configuration 1(lower plot) for the  trajectory tracking task.}
+    \label{fig:q_track}
+\end{figure}
+The evolution of the joint angles of the VMS in configuration 1 and the FBM during the given trajectory tracking task is plotted in Fig. \ref{fig:q_track}. Since the end-effector reference lies in the $x-z$ plane, the FBM only uses the joints $q_2$, $q_4$ and $q_6$ to achieve the desired motion. The VMS uses the same manipulator joints, in addition to its base joint $\hat{q}_2$ to achieve the same end-effector motion.
+The small movements in the base joint $\hat{q}_2$ correspond to a significant movement of the end-effector due to the length of its rope. 
+\end{comment}
+
+The nullspace velocities corresponding to the redundant DoF are plotted in Fig. \ref{fig:vn_track}. The fixed-base robot has one extra DoF, and thus only one nullspace velocity whereas the VMS has four degrees of redundancy. We observe that the nullspace velocities of the VMS oscillates with a frequency matching the reference signal. However, the variation in the redundant DoF does not affect the end-effector dynamics due to the appropriate selection of the nullspace operator $\bm{N}$ in \eqref{eq:nullspace}.
+\begin{figure}[h]
+    \centering
+    \includegraphics[scale=0.35]{figures/IROS23/Track_Vn_new_2.eps}
+    \caption{Nullspace velocities of the FBM (left) and the VMS in configuration 1(right) during the trajectory tracking task.}
+    \label{fig:vn_track}
+\end{figure}
+\subsection{Setpoint Regulation with External Disturbances}
+\begin{figure}[h]
+    \centering
+    \includegraphics[scale=0.285]{figures/IROS23/Dist_Forces_new_cor.eps}
+    \caption{External disturbances and the corresponding end-effector commanded forces on the FBM and VMS during the setpoint regulation task.}
+    \label{fig:F_command}
+\end{figure}
+\begin{figure}[h]
+    \centering
+    \includegraphics[scale=0.3]{figures/IROS23/Dist_EE_new_cor.eps}
+    \caption{Deviation of the end-effector pose $\bm{\hat{x}_{e}}$ of the VMS from its initial pose $\bm{\hat{x}}_{e0}$ during the setpoint regulation task, corresponding to the forces shown in Fig. \ref{fig:F_command}}.
+    \label{fig:ee_F_command}
+\end{figure}
+In the second scenario, the VMS end-effector was commanded to maintain its initial position and orientation, in the presence of external disturbances (Fig. \ref{fig:F_command}). The external disturbances are applied from around five seconds onwards by a human. These disturbances were applied at the end-effector of the FBM with magnitudes up to around 25 N. From Fig. \ref{fig:F_command}, we can see that the commanded forces of the VMS end-effector were in the opposite direction of the external forces, in order to counteract them. We can also observe that the end-effector forces commanded by the VMS and the FBM are of different magnitudes. The end-effector positions during the setpoint regulation task are plotted in Fig. \ref{fig:ee_F_command}, which depicts that they are compliant with the external disturbances.
+
+\subsection{Physical Interaction}
+The final scenario is a physical interaction task consisting of four different stages as shown in Fig. \ref{fig:phy}, in order to demonstrate compliant behaviour of the designed control system on a fixed known environment. In this task, the VMS end-effector is given a reference in the $z$-direction such that it is able to push against the external object for a few seconds. The external contact forces during the interaction were taken into account for the impedance matching of the VMS with the FBM.  Fig. \ref{fig:phy_f} shows the external forces at the FBM end-effector during the task, with the contact periods highlighted in orange. The contact forces mostly acted along the $z$-axis of the end-effector, as it was commanded a vertical downward motion during the task. There was however also some effect in the other coordinates, mainly the $x$ and $\theta$ coordinates, due to the coupling effect along these axes. The effects of the motion of the end-effector and the external forces experienced by it were reflected in the base-motion of the VMS, which tilts during the task. This can be directly correlated to \eqref{eq:dyn_decop_vms}, which describes how the external contact forces $\bm{F_{ext}}$ affect the end-effector of the VMS, which is related to its base coordinates using \eqref{eq:recons}. In our case, the base of the VMS and the robot moves in the same direction as the base is fully actuated. For a free-floating base, a different motion might be observed which will be investigated in the future work.
+\begin{figure}[h]
+    \centering
+    \includegraphics[scale=0.15]{figures/IROS23/combined_motion_3.png}
+    \caption{The VMS and the corresponding configurations of the FBM during the task of physical interaction with the environment. The contact happens with the external object, which is a cardboard box.}
+    \label{fig:phy}
+\end{figure}
+\begin{figure}[H]
+    \centering
+    \includegraphics[scale=0.325]{figures/IROS23/Phy_Forces_new.eps}
+    \caption{Contact forces on the end-effector of the FBM during the physical interaction task. The periods of external contact are highlighted using orange markers.}
+    \label{fig:phy_f}
+\end{figure}
+\section{Conclusions and future work}
+\label{sec:IROS:conclusions}
+In this paper, a novel approach for performing hardware-in-the-loop simulations has been presented, which takes into account the actual contact dynamics of the end-effector with the environment. Our approach is based on an impedance-matching strategy of the end-effector dynamics, while simulating the redundant degrees of freedom of the VMS using nullspace coordinates. Our approach also compensates for drift in the end-effector position, which can happen due to the numeric integration of the nullspace and end-effector velocities to obtain a full configuration of the VMS. The main benefit of our proposed approach is its generic structure that can be applied to match the end-effector dynamics of a given VMS with a FBM. In this paper, we successfully validated our HILS approach on a 10-DoF suspended aerial manipulator system using the Franka Research 3 robot.
+
+In our future research, we intend to integrate a force-torque sensor to the end-effector of the emulator system instead of relying on estimates of the external forces, which can potentially improve the tracking results. In the future, we also intend to scale the motion of the emulated system, so that a larger or smaller workspace of the VMS can be matched with the given system. Moreover, our HILS approach will be compared with an actual  mobile-based-manipulator robot in a lab environment  to perform physical interaction tasks.Additionally, we plan to apply our approach to other VMS with more complex dynamics, such as the Eelume autonomous underwater vehicle \cite{liljeback2017}.
+
+%\addtolength{\textheight}{-12cm}   % This command serves to balance the column lengths
+                                  % on the last page of the document manually. It shortens
+                                  % the textheight of the last page by a suitable amount.
+                                  % This command does not take effect until the next page
+                                  % so it should come on the page before the last. Make
+                                  % sure that you do not shorten the textheight too much.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section*{ACKNOWLEDGMENT}
+The authors would like to thank Hrishik Mishra for the valuable discussion on impedance matching.
+
+\ifSubfilesClassLoaded{%
+  \bibliographystyle{\chosenbibstyle}
+  \bibliography{\bibfilename}
+}{}
+
+\end{document}

@@ -1,4 +1,4 @@
-\documentclass[main.tex]{subfiles}
+\documentclass[../main.tex]{subfiles}
 
 \begin{document}
 
@@ -9,6 +9,117 @@
 
 \section{Preliminary 1}
 \section{Preliminary 2}
+
+
+\section{Generalized Inverses}
+For a thorough introduction to generalized inverses of matrices, one should read \cite{ben-israel2003}. Nevertheless, as the concept is heavily used within control of redundant robots, a introduction of the concepts is given here.
+
+It has been shown in \cite{penrose1955} that for every matrix $\bm{A}$ there exists a unique matrix $\bm{X}$ satisfying the following four properties:
+\begin{subequations}
+    \label{eq:pseudoinverse_properties}
+\begin{align}
+        \bm{A}\bm{X}\bm{A} &= \bm{A} \\
+        \bm{X}\bm{A}\bm{X} &= \bm{X} \\
+        (\bm{A}\bm{X})^T &= \bm{A}\bm{X} \\
+        (\bm{X}\bm{A})^T &= \bm{X}\bm{A}
+\end{align}
+\end{subequations}
+These are called the Penrose equations, and the matrix $\bm{X}$ is called the Moore-Penrose inverse of $\bm{A}$ after the work in \cite{moore1920,penrose1955}, sometimes just "the pseudoinverse" or a generalized inverse. We will denote it as
+\begin{equation}
+    \bm{X} = \bm{A}^{\dagger}
+\end{equation}.
+
+Note that whenever $\bm{A}$ is square and of full rank, the Moore-Penrose inverse coincides with the normal inverse $\bm{A}^{-1}$, which satisfies all the properties of \cref{eq:pseudoinverse_properties}. In cases where we apply a generalized inverse that only satisfies some of these properties we will refer to it as a ${i,j, ..., k}$-inverse, where $i, j, k$ are the indexes of the respective properties $(1,2,3,4)$.
+
+When the matrix $\bm{A}$ has full row rank, its Moore-Penrose pseudoinverse can be calculated as
+\begin{equation}
+    \bm{A}^{\dagger} = \bm{A}^T (\bm{A}\bm{A}^T)^{-1},
+\end{equation}
+and when it has full row rank as
+\begin{equation}
+    \bm{A}^{\dagger} = (\bm{A}\bm{A}^T)^{-1}\bm{A}^T.
+\end{equation}
+
+In the general case, when $\bm{A}$ is not of full rank, its pseudoinverse can be found using its singular value decomposition.
+\begin{equation}
+    \bm{A}^{\dagger} = \bm{V} \bm{\Sigma}^T \bm{U}^T,
+\end{equation}
+where
+\begin{equation}
+    \bm{A} = \bm{U \Sigma V}^T.
+\end{equation}
+
+\begin{remark}
+    Throughout this document, we are only concerned with matrices of real numbers. For complex matrices, one should replace the transpose with the conjugate transpose $\bm{A}^{*}$.
+\end{remark}
+
+\subsubsection{Weighted inverses}
+The inverse of a matrix can be thought of as finding a matrix that solves the problem
+\begin{equation}
+    \bm{A}\bm{x} = \bm{b}
+\end{equation}
+such that
+\begin{equation}
+    \bm{x} = \bm{A}^{-1}\bm{b}
+\end{equation}
+where $\bm{A} \in \mathbb{R}^{m \times n}$, $\bm{b} \in \mathbb{R}^{m}$, and $\bm{x} \in \mathbb{R}^{n}$. For underdetermined equations, where $n>m$ the inverse of the matrix $\bm{A}$ can not be found, and one must instead find the matrix $\bm{X}$ that minimizes the residual
+\begin{equation}
+    \norm{\bm{A} \bm{x} -  \bm{b}}, \quad \text{where } \bm{x} = \bm{X}\bm{b}
+\end{equation}
+which is solved by any (1,3)-inverse of $\bm{A}$ (i.e. $\bm{X} \in \bm{A}\{1, 3\}$) \cite[Chapter 3]{ben-israel2003}. Instead of the Euclidian norm, one can also minimize a weighted norm of the residual
+\begin{equation}
+    \norm{\bm{A}\bm{x} - \bm{b}}_W = (\bm{A}\bm{x} - \bm{b})^T \bm{W} (\bm{A}\bm{x} - \bm{b}),
+\end{equation}
+where $\bm{W} \in \mathbb{R}^{m \times m}$ is a given PD matrix. This solution is found as
+\begin{equation}
+    \bm{X} = \bm{A}^{\dagger}_W = (\bm{A}^T \bm{W} \bm{A})^{-1} \bm{A}^T \bm{W},
+\end{equation}
+satisfying
+\begin{subequations}
+    \begin{align}
+        \bm{A}\bm{X}\bm{A} &= \bm{A} \\
+        (\bm{W}\bm{A}\bm{X})^T &= \bm{W}\bm{A}\bm{X}
+    \end{align}
+\end{subequations}
+
+On the other hand, if $\bm{A} \in \mathbb{R}^{m \times n}$ with $m > n$, the system is underdetermined, and there may be infinity many solutions. The general solution in such a case is
+\begin{equation}
+    \bm{x} = \bm{X}\bm{b} + (\bm{I} - \bm{A}^T\bm{A}) \bm{y}
+\end{equation}
+for an arbitrary vector $\bm{y} \in \mathbb{R}^n$.
+
+Using the general Moore-Penrose in this case will find the $\bm{x}$ with the smallest Euclidian norm. In some cases, we might also wish to have a different weighting of this, to instead minimize
+\begin{equation}
+    \norm{\bm{x}}_Q = \bm{x}^T \bm{Q} \bm{x},
+\end{equation}
+with $\bm{Q} \in \mathbb{R}^{n \times n}$ is another PD weighting matrix. This can be achieved by a solution-weighted pseudoinverse.
+\begin{equation}
+    \bm{A}^{\dagger}_Q = \bm{Q}^{-1} \bm{A}^T (\bm{A} \bm{Q}^{-1} \bm{A}^T)^{-1},
+\end{equation}
+satisfying
+\begin{subequations}
+    \begin{align}
+        \bm{A}\bm{X}\bm{A} &= \bm{A} \\
+        (\bm{Q}\bm{X}\bm{A})^T &= \bm{Q} \bm{X} \bm{A}
+    \end{align}
+\end{subequations}
+
+If $\bm{A}$ is not of full rank, these inverses may not be unique, and one can therefore choose a solution that minimizes both a weighted residual, and weighted solution. To this end, one can find a $\{1, 2\}$-inverse weighted with both $\bm{W}$ and $\bm{q}$. The formula for this is given by
+\begin{equation}
+    \bm{A}^{(1, 2)}_{(W, Q)}
+    = \bm{Q}^{-1} \bm{A}^T \bm{W} \bm{A}
+    (\bm{A}^T \bm{W} \bm{A} \bm{Q}^{-1} \bm{A}^T \bm{W} \bm{A})^{\dagger}
+    \bm{A}^T \bm{W},
+\end{equation}
+and $\bm{X} = \bm{A}^{(1, 2)}_{(W, Q)}$ satisfies
+\begin{subequations}
+    \begin{align}
+        \bm{AXA} &= \bm{A} \\
+        \bm{XAX} &= \bm{X} \\
+        (\bm{W}\bm{A}\bm{X})^T &= \bm{W}\bm{A}\bm{X} \\
+        (\bm{Q}\bm{X}\bm{A})^T &= \bm{Q} \bm{X} \bm{A}
+    \end{align}
+\end{subequations}
 \section{Preliminary 3}
 \section{Preliminary 4}
 \section{Preliminary 5}
