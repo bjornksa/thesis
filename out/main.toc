@@ -1,5 +1,0 @@
-\babel@toc {british}{}\relax 
-\contentsline {chapter}{Contents}{vii}{Doc-Start}%
-\contentsline {chapter}{List of Tables}{ix}{Doc-Start}%
-\contentsline {chapter}{List of Figures}{xi}{Doc-Start}%
-\contentsline {chapter}{\numberline {1}Introduction}{1}{chapter.1}%
