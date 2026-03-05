@@ -1,0 +1,653 @@
+\documentclass[../main.tex]{subfiles}
+
+\begin{document}
+
+%\usepackage{pifont}
+
+
+
+
+Snake-like articulated vehicles have become increasingly common in recent years, both in aerial and marine applications. One of the main benefits of the articulated design is the increased maneuverability, allowing movement in cluttered environments where traditional vessels may not fit. However, research on the topic of path following for these types of vessels is fairly limited, not utilizing the flexibility of the articulated system to its full extent. There has been some research on path following using a swimming gait, but this requires an undulating motion around the path and is less suited for articulated systems with external thrusters. In this paper a method for path following is developed where each link is kept on the path at all times. The general idea is to use an existing line-of-sight guidance method and combine it with a kinematic task-priority controller to control the joints of the system. The stability properties of the proposed method will be examined theoretically, and validated in simulation.
+
+%===============================================================================
+
+\section{Introduction}
+\label{introduction}
+%
+The motivation for this work comes from the challenges and opportunities presented by the unique design of the Eelume articulated intervention autonomous underwater vehicle (AIAUV) and other articulated vehicles with external propulsion methods such as the EELS \citep{carpenter2021}, HippoCampus \citep{bauschmann2023}, and the DRAGON \citep{zhao2018}. By articulated vehicles, we refer to vehicles consisting of several links with revolute joints between them. The slender, articulated body of the vehicles theoretically allow access for inspection, maintenance and repair (IMR) tasks where larger IMR capable vehicles are hindered by the environment. Although articulated vehicles do not necessarily have interaction capabilities, they can be thought of as a subset of (underwater) vehicle manipulator systems ((U)VMS) where the base is simply the first link of the system. This paper considers the problem of path following for such systems. The goal is to find an efficient method of keeping as much of the system on the path as possible at all times, utilizing the articulated nature of the vehicle to allow maneuvering in confined environments. When defining a collision-free path through an environment, a typical approach is to use a \emph{radius of safety}, for example defined as the length of the vehicle, that should be the minimum distance from any point on the path to the closest obstacle. For articulated vehicles, one can instead utilize a string of smaller safety radii, one for each link. This gives a less conservative constraint to the path planning algorithm.
+
+There is a large body of literature on path following for traditional vessels, both surface and underwater \citep{healey1993,pettersen2001, nelson2007,lapierre2007}. These methods naturally do not utilize redundancies in the vehicles as they only consider single-body non-redundant systems. We seek to expand these existing methods to allow them to work for articulated vehicles as well. Moreover, we want to utilize one of the main benefits of the articulated design, which is the increased maneuverability, allowing movement in cluttered environments where traditional vessels may not fit. However, research on the topic of path following for these types of vessels is fairly limited, not utilizing the flexibility of the articulated system to its full extent.
+
+%Additionally, we classify the methods based on whether they are implemented for general parametrized curved paths, straight line segments between waypoints or completely straight paths, as well as whether the paths are 2 or 3-dimensional.
+
+There has been some previous works looking into the topic of path following for articulated vehicles. Particularly, many works focus on bio-inspired snake robots. Several methods are designed for path following using an undulating swimming gait for locomotion \cite{kelasidi2017,mohammadi2016}, which is unnecessary for systems with external thrusters, and causes the system to oscillate around the path instead of converging to it exactly. Methods developed for thruster-actuated systems do not require using the joints to achieve forward motion, and can therefore use them in other ways instead. A possible approach is to use the joints to curve the system towards the path, in essence utilizing the whole system body as a rudder to steer in the desired direction. This approach is used in \cite{wrzos-kaminska2019}, but only implemented for straight-line paths.
+%A similar idea is used in \cite{hoffmann2018}, where the robot is curved towards the path to decrease hydrodynamic drag forces. Again this is only implemented for straight path segments.
+% The simplest approach as used in \cite{husebo2022} is to simply keep the joints straight at all times and control the system as a traditional autonomous underwater vehicle (AUV). This is simple to implement, but does not utilize the system to its full extent, and only guarantees that the center link actually stays on the path.
+
+The method presented in \cite{engebretsen2019a} utilizes thrusters for propulsion and does path following for curved paths. It also utilizes the redundancy of the system to put several links on the path simultaneously. To achieve this, a base link (generally chosen as the center link) is steered to the path using a moving Serret-Frenet frame \citep{lapierre2007}, while the end links are controlled to the path using the joints. This ensures that the middle and end links converge to the path, but not necessarily all the links. Further, it is only implemented for a two-link vehicle. In \cite{gushkov2024} an MPC-based method is used, where the cross-track errors and the deviation of the head link's velocity from a guidance law is encoded into the cost function, and the AIAUV's kinematic constraints are encoded in the MPC formulation. This approach seems promising, but is computationally expensive and does not have theoretical stability results. The main motivation for the method proposed in this paper is to create a computationally cheap, simple-to-implement approach that guarantees that all links stay on the path.
+
+As articulated vehicles are highly redundant in regard to the pose of any one link, they lend themselves well to task-priority control methods. These methods utilize the redundant degrees of freedom (DoF) to perform several tasks at the same time. They are much used for redundant robot manipulators, where the highest-priority task generally is the end-effector pose, and lower-priority tasks can include optimizing the system pose or avoiding obstacles. Early work on redundancy resolution for fixed-base robot manipulators was done in \cite{Nakamura1987,chiaverini1997}, and later its stability properties were analyzed in \cite{antonelli2009}. For the specific case of underwater VMS, there is also a fairly large body of work, including both velocity level control \citep{antonelli1998,borlaug2020a}, and on the acceleration level \citep{brantner2021,saebo2022}. While acceleration level task-priority has some clear benefits for VMS, taking the coupling effect between manipulator and base explicitly into account, they can also have issues if there are modelling uncertainties \citep{iversflaten2023}. Additionally, since both the LOS and velocity-level task-priority approaches are formulated in terms of desired velocities and poses, they are well suited for a combined approach. Due to this, as well as their ease of implementation, in this work we use velocity-level task-priority, specifically the closed-loop inverse kinematics (CLIK) algorithm \citep{antonelli2009}.
+
+The specific contribution in this article is to present a combined framework using Waypoint LOS guidance and CLIK to set the desired velocities for a dynamic controller for articulated vehicles, to achieve path following for articulated robots where all links stay on the path. The framework utilizes the system redundancy to ensure that the center of each link will converge to the path. The article considers two-dimensional paths defined by waypoints with straight line segments between them. We present a simulation study in which the proposed approach is compared using two different sets of tasks and with an alternative approach that does not utilize the system redundancy, validating the increased performance of the suggested method.
+
+The article is organized as follows; in Sec. \ref{sec:model}, a model of an articulated marine vehicle is presented, and in Sec. \ref{sec:background} relevant background material in LOS guidance and task-priority control is introduced, while our proposed method is explained in detail in Sec. \ref{sec:method}. Its theoretical stability properties are analyzed in Sec. \ref{sec:stability} Finally, the method is tested in simulations in Sec. \ref{sec:simulations}, before the paper is concluded in Sec. \ref{sec:conclusions}.
+
+
+\section{SYSTEM MODEL}
+\label{sec:model}
+We consider a planar VMS with $n-1$ revolute joints and $n$ links. The complete configuration of the system then has $n+2$ DoFs and is given by
+\begin{equation}
+    \bm{\xi} = \begin{bmatrix}
+        x_b & y_b & \psi_b & \theta_1 & \cdots & \theta_{n-1}
+    \end{bmatrix}^T,
+\end{equation}
+where $x_b, y_b,$ and $\psi_b$ are the $x$ and $y$ position and rotation of the base link relative to an inertial frame $\{n\}$ and $\theta_i$ is the angle of link $i$ for $i = 1, \ldots, n$. We use the notation $(\cdot)_{ab}^c$ to denote the pose of $\{a\}$ relative to $\{b\}$, expressed in $\{c\}$, simplifying to $(\cdot)^a_{b}$ when $\{a\} = \{c\}$. To describe the configurations of each link of the vehicle, we use a reference frame rigidly attached to the center of each link, with positive $x$-direction towards the front of the link. The base frame is denoted $\{b\}$, while for the remaining links we write $\{ i\}$, where $i$ is the number of the link, with the base being number one. The final link is link number $n$, and we refer to it as the \emph{head} link. See Figure~\ref{fig:VMS} for an example of a system with two links.
+\begin{figure}
+    \centering
+    \includegraphics[width=\linewidth]{diagrams/ref_frames_2.png}
+    \caption{Reference frames for an articulated vehicle with two links}
+    \label{fig:VMS}
+\end{figure}
+
+The pose of the base relative to the inertial frame can also be described by a homogeneous transformation $\bm{H} \in SE(2)$
+\begin{equation}
+    % \bm{H} = \begin{bmatrix}
+    %     \cos(\psi_b) & -\sin(\psi_b) & x_b \\
+    %     \sin(\psi_b) & \cos(\psi_b) & y_b \\
+    %     0 & 0 & 1
+    % \end{bmatrix}
+    \bm{H} = \begin{bmatrix}
+        \bm{R}(\psi_b) & \bm{p}_{b}^n \\
+        \bm{0}_{1 \times 3} & 1
+    \end{bmatrix},
+\end{equation}
+where $\bm{R}(\psi_b) \in \SO(2)$ is the rotation matrix describing a rotation of $\psi_b$. Note that we use the notation $\bm{0}_{n \times m}$ to represent a zero matrix with $n$ rows and $m$ columns. A similar representation can be used for each link. We therefore define $\bm{H}_i$ as the transformation from the inertial frame to link $i$, with $\bm{H}_1 = \bm{H}$. The transformations between link frames are gives by $\bm{A}_i \in \SE(2)$ which transforms from link $i$ to link $i+1$. The link poses can then be found recursively as
+\begin{equation}
+    \bm{H}_{i+1} = \bm{H} \bm{A}_1 \bm{A}_2 \cdots \bm{A}_i.
+\end{equation}
+From this it is simple to extract the position $\bm{p}_{i}^n$ and heading $\psi_{i}^n$ of each link.
+
+The system velocity is described by a vector
+\begin{equation}
+    \label{eq:zeta}
+    \bm{\zeta} = \begin{bmatrix} (\bm{\nu}^b_{n,b})^T & \dot{\bm{\theta}}^T \end{bmatrix}^T
+\end{equation}
+which contains the body-fixed velocities $\bm{\nu} = \begin{bmatrix} u & v &\dot{\psi} \end{bmatrix}^T$ of the base, and the joint velocities $\dot{\bm{\theta}}$. The body velocities of the remaining links can be found using the link Jacobians, which map from the general system velocities $\bm{\zeta}$ to the velocities of each link, expressed in the link frame. That is
+\begin{equation}
+    \label{eq:link_jacobian}
+    \bm{\nu}_i = \bm{J}_i^b(\bm{\theta}) \bm{\zeta},
+\end{equation}
+where $\bm{J}_1^b = \begin{bmatrix}
+        \bm{I}_{3 \times 3} & \bm{0}_{3 \times n}
+    \end{bmatrix}$,
+and the remaining Jacobians can be calculated recursively.
+% \begin{equation}
+%     \bm{J}_{i+1} = \Ad(\bm{A}_{1,i})\bm{J}_i + \begin{bmatrix}
+%         \bm{0}_{1, i-1} & \bm{a}_i & \bm{0}_{1, n-i}
+%     \end{bmatrix}
+% \end{equation}
+% where $\bm{a}_i$ are the twist coordinates of link $i$, and $\Ad(\bm{A})$ is the adjoint of a matrix $\bm{A}$.
+
+Following \cite{schmidt-didlaukies2018, from2014}, the dynamics of an articulated underwater vehicle can be expressed as
+\begin{subequations}
+    \label{eq:dynamics}
+    \begin{align}
+        \dot{\bm{\xi}} &= \bm{J}_\xi \bm{\zeta} \\
+        \bm{M}(\bm{\theta}) \dot{\bm{\zeta}} + \bm{C}(\bm{\xi}, \bm{\zeta}) \bm{\zeta}
+        + \bm{D}(\bm{\xi}, \bm{\zeta}) \bm{\zeta} &= \bm{\tau} + \bm{\tau}^{\rm ext}.
+    \end{align}
+\end{subequations}
+Here, $\bm{M}(\bm{\theta})$ is the inertia matrix, including added mass effects, $\bm{C}(\bm{\xi}, \bm{\zeta})$ is the Coriolis/centrifugal matrix, $\bm{D}(\bm{\xi}, \bm{\zeta})$ is the hydrodynamic damping matrix, and $\bm{\tau}$ is the control input. $\bm{J}_{\xi}$ transforms from body to spatial velocities. Since we are working in the plane, we assume a neutrally buoyant vehicle, and thus no hydrostatic restoring forces.
+
+\section{Background}
+\label{sec:background}
+
+\subsection{Task-priority approach}
+\label{sec:background_tp}
+The goal of the task-priority method is to control the system to achieve a set of prioritized tasks, in such a way that the highest-priority tasks are unaffected by the lower ones. The lower-priority tasks are thus solved as long as this is possible, while any tasks completely incompatible with the higher ones will not be solved.
+The tasks are defined by their task coordinates, a function of the system coordinates.
+\begin{equation}
+    \bm{x}_A = f_A (\bm{\xi}) \in \mathbb{R}^{m_A}.
+\end{equation}
+In general, this relationship can be highly nonlinear and difficult to utilize in a control framework. Therefore, we instead use the \emph{task Jacobians}, which give the relationship between system and task velocities
+\begin{equation}
+    \label{eq:task_definition}
+    \dot{\bm{x}}_A = \bm{J}_A \bm{\zeta}, \quad
+    \bm{J}_A \in \mathbb{R}^{m_A \times (n + 2)}.
+\end{equation}
+Throughout the text we will use uppercase letters in subscripts to denote task quantities, with earlier letters being higher-prioritized tasks, i.e. task $\bm{x}_A$ has higher priority than task $\bm{x}_B$, etc. The subscript $(\cdot)_d$ is used to refer to desired quantities.
+For a single task, we can find the desired system velocities corresponding to some desired task velocities using the pseudoinverse of the Jacobian
+\begin{equation}
+    \bm{\zeta}_d = \bm{J}_A^{\dagger} \dot{\bm{x}}_{A,d}.
+\end{equation}
+
+The desired velocities $\bm{\zeta}_d$ can then be used as the reference in a dynamic controller. This is known as an inverse kinematics method. Implementing it directly will lead to drift in the positions, so in practice a closed-loop version is generally used \citep{chiaverini1997}. This is done by introducing feedback of the task position errors
+\begin{equation}
+    \label{eq:single_task}
+    \bm{\zeta}_d = \bm{J}_A^{\dagger} \bm{\sigma}_{A},
+    \quad
+    \bm{\sigma}_A = \dot{\bm{x}}_{A, d} - \bm{\Lambda}_A \tilde{\bm{x}}_A
+\end{equation}
+Here $\dot{\bm{x}}_{i, d}$ is the desired task velocity, $\bm{\Lambda}_A$ is a positive definite gain matrix, and $\tilde{\bm{x}}_i = \bm{x}_{i} - \bm{x}_{i, d}$ is the task error. To ensure the remaining tasks do not interfere with the highest-priority one, we can project them into the tasks null space using a null space operator, defined as
+\begin{equation}
+    \bm{N}_A = (\bm{I}_{n+2} - \bm{J}_A^{\dagger} \bm{J}_A),
+\end{equation}
+where $\bm{I}_{n+2}$ is the $(n+2) \times (n+2)$ identity matrix. Lower-priority tasks can then be added as
+\begin{equation}
+    \bm{\zeta}_d = \bm{J}_A^{\dagger} \bm{\sigma}_A
+    + \bm{N}_A \bm{J}_B^{\dagger} \bm{\sigma}_B
+\end{equation}
+where the null space projector removes any velocity components from $\bm{\sigma}_d$ that would interfere with the main task. This can be extended to an arbitrary amount of tasks by projecting them into the null space of all higher-priority tasks. This is done using the \emph{augmented} Jacobian, which is all higher-priority Jacobians stacked, giving
+\begin{equation}
+    \bm{J}_{AB} = \begin{bmatrix}
+        \bm{J}_A \\ \bm{J}_B
+    \end{bmatrix} \quad
+    \bm{N}_{AB} = (\bm{I}_n - \bm{J}_{AB}^{\dagger} \bm{J}_{AB}),
+\end{equation}
+for the first two tasks, and equivalently for those of higher priority.
+This finally gives an expression for the desired system velocities
+\begin{equation}
+    \bm{\zeta}_d = \bm{J}_A^{\dagger} \bm{\sigma}_A
+    + \bm{N}_A \bm{J}_B^{\dagger} \bm{\sigma}_B
+    + \bm{N}_{AB} \bm{J}_C^{\dagger} \bm{\sigma}_C
+    + \cdots
+    + \bar{\bm{N}} \bm{J}_X^{\dagger} \bm{\sigma}_X.
+\end{equation}
+
+\subsection{Line-of-Sight Guidance}
+\label{sec:LOS}
+We wish to apply a LOS guidance law as the primary task in the task-priority scheme, such that path following is the highest-prioritized control objective. Therefore, a LOS approach is presented here before the combined approach is presented in Section \ref{sec:method}.
+
+We consider the case of following a path given by several waypoints $\{w_j = \begin{pmatrix}x_j & y_j\end{pmatrix}^T\}, \;  j \in \mathbb{N}$, with straight line segments between them. Several methods for controlling a vessel onto such a path are described in \cite{fossen2021}. In this paper we use the proportional LOS guidance law. It is defined by the definition of a desired course angle
+\begin{equation}
+    \chi_d = \pi^p - \tan^{-1}(K_p y_e^p),
+\end{equation}
+where $\pi^p$ is the angle of the path segment, which can be found by
+\begin{equation}
+    \pi_p = \text{atan2}(y_{j+1}^n -y_{j}^n, x_{j+1}^n - x_{j}^n),
+\end{equation}
+$x_j^n, y_j^n$, being the coordinates of waypoint number $j$. The cross-track error $y_e^p$ is the distance orthogonally from the path segment, and $K_p = 1 / \Delta$ is a proportional gain, parametrized by a \emph{lookahead distance} $\Delta$. Using this along with a constant forward motion ensures that the origin of the cross-track error dynamics are uniformly semi-globally exponentially stable \citep{fossen2014}.
+\section{PROPOSED METHOD}
+\label{sec:method}
+\begin{figure*}
+    \centering
+    \includegraphics[width=0.9\linewidth]{diagrams/block.png}
+    \caption{Proposed control architecture}
+    \label{fig:block}
+\end{figure*}
+
+In this section we present our proposed path following method, showing the details of how the LOS guidance law is included as the highest priority task in a CLIK task priority framework. Figure \ref{fig:block} shows a block diagram of the complete control architecture.
+
+As described in Sec. \ref{sec:model}, we can use the base position and joint angles to find the position of each link. For each path segment, we define a path frame $\{p_j\}$ which has its origin in the waypoint $w_j$ and is rotated  by an angle $\pi^{p}_j$ from $\{n\}$. The position of a link $i$ in the path frame, is given by
+\begin{equation}
+    \bm{p}_i^{p_j} = \bm{R}(-\pi_p) \left(\bm{p}_i^n - \bm{w}_j \right)
+    =\begin{bmatrix}
+        x_i^p \\ y_i^p
+    \end{bmatrix}.
+\end{equation}
+
+The link velocities in the path frame can be found by defining a \emph{path link Jacobian} $\bm{J}^p_i$, which is simply found by rotating the first two rows of the body link Jacobian $\bm{J}^b_i$ into the path frame
+\begin{equation}
+    \label{eq:path_Jacobian}
+    \bm{J}^p_i = \begin{bmatrix}
+        \bm{R}(\psi_i - \pi_p) & \bm{0}_{2 \times 1} \\
+        \bm{0}_{1 \times 2} & 1
+    \end{bmatrix}
+    \bm{J}^b_i.
+\end{equation}
+This gives the link velocities expressed in the path frame
+\begin{equation}
+    \label{eq:path_velocities}
+    \bm{\nu}^p_{i} = \bm{J}^p_i \bm{\zeta} = \begin{bmatrix}
+        \dot{x_i}^p & \dot{y_i}^p & \dot{\psi}_i
+    \end{bmatrix}^T.
+\end{equation}
+
+To be able to combine LOS guidance with the CLIK algorithm requires defining suitable tasks. We choose to use one link as the main link, and apply LOS guidance on this link as the  highest-priority task. Choosing a suitable LOS guidance law for the main link will ensure that the link converges to the path. We suggest to use one of the two ends as the main link, as this will either "push" or "pull" the remaining links along with them, thus creating a natural motion. As an alternative, the center link may also be chosen, as this in some ways represents the total center of the vehicle.
+
+Controlling one link to the path with a desired angle requires only two DoFs, while an articulated system in the plane will have a total of $n+2$ DoFs. In our approach, we utilize this redundancy to place the remaining links on the path as well. In this work we present two main possible options, summarized below. We refer to the methods as a Link LOS method, and a Link Cross-track method.
+
+
+\begin{assumption}
+    \label{ass:perfect_dyn}
+    The dynamic controller tracks the desired references from the kinematic controller perfectly, i.e.
+    \begin{equation}
+        \bm{\zeta} = \bm{\zeta}_d
+    \end{equation}
+\end{assumption}
+
+\begin{remark}
+    This is a common assumption when analyzing inverse kinematics methods \citep{antonelli2009}, and requires bandwith separation between the inner loop of the dynamic controller and the outer kinematic controller loop. In essence this means that the desired trajectories are sufficiently slow compared to the dynamics of the system.
+\end{remark}
+
+\subsection{Main task}
+\label{sec:main_task}
+We choose the primary task for both methods to be the same, namely to achieve the LOS objective for the head link of the vehicle. This means setting the desired heading and forward velocity of the head link, as described in Section \ref{sec:LOS}. Note that we control the heading angle, that is the pointing direction of the link, not the course angle, which is the angle of the links' velocity vector. To compensate for any sideways motion, we therefore set the desired heading $\psi_{n,d} = \xi_{n,d} - \beta_n$, where $\beta_n$ is the \emph{crab angle} \citep{fossen2021} of the link, defined as the angle between the course and heading.
+
+We also include the sideways \emph{sway} velocity of the link in the task, without controlling it. This is done to ensure that lower-priority tasks can not utilize sideways motion of the end-effector to achieve their goals, which would disturb the LOS guidance of the head link. We thus choose the following primary task:
+\begin{equation}
+    \label{eq:task_a}
+    \qquad \bm{x}_A = \begin{bmatrix}
+        u_n \\ v_n \\ \psi_n
+    \end{bmatrix}, \quad
+    \bm{J}_A = \bm{J}_n^b,
+    \setlength\abovedisplayskip{-5pt}
+\end{equation}
+with desired values given by
+\begin{subequations}
+\begin{align}
+    \label{eq:desired_xa}
+    \psi_{n, d} &=
+        \pi_p - \tan^{-1}(y_n^p / \Delta_n) - \beta_{n},
+    \\
+    \dot{\bm{x}}_{A, d} &= \begin{bmatrix}
+        u_{LOS} & 0 & \dot{\psi}_d
+    \end{bmatrix}^T.
+\end{align}
+\end{subequations}
+Here, $u_{LOS}$ is the desired forward velocity of the head link. Note that this will also be the forward direction of the entire system, always moving in the direction the head link is pointing. $\dot{\psi}_d$ is the derivative of the desired heading, and is given in Eq. \eqref{eq:psi_d_dot}.
+\begin{remark}
+    Note that for the forward velocity, we do not have a corresponding desired position. We instead set the desired forward velocity directly.
+\end{remark}
+As discussed in Section \ref{sec:background_tp}, we include feedback of the task error, with a positive definite gain matrix $\bm{\Lambda}_A$, which gives
+\begin{equation}
+    \bm{\sigma}_A = \begin{bmatrix} u_{LOS} \\ 0 \\ \dot{\psi}_d \end{bmatrix} - \bm{\Lambda}_A \begin{bmatrix}
+        0 \\ 0 \\ \psi_n - \psi_{n,d}
+    \end{bmatrix}.
+\end{equation}
+When the task Jacobian $\bm{J}_A$ has full row rank, following Assumption \ref{ass:perfect_dyn}, we can use Eq. \eqref{eq:task_definition} to find the closed-loop dynamics of the task error as
+\begin{equation}
+    \label{eq:task_a_dyn}
+    \dot{\bm{x}}_A = \bm{J}_A \bm{\zeta}_d
+    = \bm{J}_A \left(\bm{J}_A^{\dagger} \bm{\sigma}_A + \bm{N}_A \bm{\zeta}_{N} \right)
+    = \bm{\sigma}_A.
+\end{equation}
+Here, $\bm{\zeta}_{N}$ denotes the desired velocities of all lower-priority tasks. We utilize the fact that $\bm{J}_A \bm{J}_A^{\dagger} = \bm{I}$, and that $\bm{J}_A \bm{N}_a = \bm{0}$. Following \cite{fossen2014}, the cross-track error dynamics of the head link is then
+\begin{equation}
+    \label{eq:head_cross_track_dynamics}
+    \dot{y}_n^p = - y_n^p\frac{u_{LOS}}{\sqrt{\Delta_n^2 + (y_n^p)^2}},
+\end{equation}
+as long as Assumption \ref{ass:perfect_dyn} holds, and $\bm{J}_A$ is full rank. $\dot{\psi}_{n, d}$ is found by differentiating Eq. \eqref{eq:desired_xa} and inserting Eq. \eqref{eq:head_cross_track_dynamics}
+\begin{equation}
+    \label{eq:psi_d_dot}
+    \dot{\psi}_{n, d} = \frac{\Delta_n \dot{y}^p_n}{\Delta_n^2 + (y^p_n)^2} = -\frac{\Delta_n y^p_n u_{\rm LOS}}{(\Delta_n^2 + (y^p_n)^2)^{\frac{3}{2}}}
+\end{equation}
+
+\subsection{Link LOS task}
+\label{sec:linkLOS}
+For the Link LOS method, we wish to apply the same guiding principle to each of the links, controlling their heading angle in the same manner as for the head link. To achieve this, we chose a lookahead distances $\Delta_i$ for each link $i$ so we can tune the controller on a per-link basis.
+
+\begin{equation}
+    \label{eq:link_LOS}
+    \bm{x}_{B1} = \begin{bmatrix}
+        \psi_1 \\ \psi_2 \\ \vdots \\ \psi_{n-1}
+    \end{bmatrix}, \quad
+    \bm{J}_{B1} = \begin{bmatrix}
+        \bm{J}_{1, \psi}^b \\ \bm{J}_{2, \psi}^b \\ \vdots \\ \bm{J}_{n-1, \psi}^b
+    \end{bmatrix}
+\end{equation}
+with \begin{equation}
+    \psi_{i, d} =
+        \pi_p - \tan^{-1}(y_i^p / \Delta_i) - \beta_i,
+    \quad
+    \dot{\bm{x}}_{B1, d} = \bm{0},
+\end{equation}
+and $\bm{J}_{i, \psi}^b$ is the third row of the link Jacobian from Eq.~\eqref{eq:link_jacobian}. Note that the Jacobian has the form
+\begin{equation}
+    \label{eq:LOS_Jacobian_tril}
+    \bm{J}_{B1} =
+    \begin{bmatrix}
+     \bm{0}_{(n-2) \times 2} & \bm{L}_{(n-2) \times (n-2)} & \bm{0}_{(n-2) \times 1}
+    \end{bmatrix},
+\end{equation}
+where $\bm{L}_{(n-2) \times (n-2)}$ is an $(n-2)\times(n-2)$ lower triangular matrix consisting of only ones. Choosing a positive definite gain matrix $\bm{\Lambda}_{B1}$, this gives
+\begin{equation}
+    \label{eq:sigma_linkLOS}
+    \bm{\sigma}_{B1} = -\bm{\Lambda}_{B1} \tilde{\bm{x}}_{B1}.
+\end{equation}
+Finally, the task dynamics are given as
+\begin{align}
+    \label{eq:link_LOS_dyn}
+    \dot{\bm{x}}_{B1} &= \bm{J}_{B1} \bm{\zeta} = \bm{J}_{B1}\bm{J}_A^{\dagger}\bm{\sigma}_A
+    + \bm{J}_{B1} \bm{N}_A \bm{J}_{B1}^\dagger \bm{\Lambda}_{B1} \tilde{\bm{x}}_{B1}
+    %
+    % &= \bm{J}_{B1}\bm{J}_A^{\dagger}\bm{\Lambda}_A \begin{bmatrix} 0 & 0 & \tilde{\psi}_n \end{bmatrix}^T
+    % + \bm{J}_{B1} \bm{N}_A \bm{J}_{B1}^\dagger \bm{\Lambda}_{B1} \tilde{\bm{x}}_{B1} \notag.
+\end{align}
+Note that, due to the zero-columns in $\bm{J}_{B1}$, the product $\bm{J}_{B1}\bm{J}_A^{\dagger}$ also has zeros in its first column, and thus the first element of $\bm{\sigma}_A$ does not affect task $x_{B1}$.
+%  That is
+% \begin{equation}
+%     \bm{J}_{B1}\bm{J}_A^{\dagger}\bm{\sigma}_A = \bm{J}_{B1}\bm{J}_A^{\dagger} \left(\begin{bmatrix}
+%         \dot{\psi}_d \\ 0 \\ 0 \end{bmatrix}
+%         +\Lambda_A \begin{bmatrix} \dot{\psi}_d \\ 0 \\ 0 \end{bmatrix}\right)
+% \end{equation}
+\subsection{Link cross-track error task}
+\label{sec:link_cross}
+In the Link cross-track method, we instead wish to control the cross-track error of the remaining links directly. This is done by using the second row of the path Jacobian $\bm{J}_i^p$ from Eq.~\eqref{eq:path_Jacobian} for each link $i$, and projecting the resulting stacked Jacobian into the null space of the main task. The desired task position and velocity for this task is zero, corresponding to each link staying exactly on the path. The link cross-track error task is then given by
+\begin{equation}
+    \label{eq:link_cross}
+    \bm{x}_{B2} = \begin{bmatrix}
+        y^p_1 \\ y^p_2 \\ \vdots \\ y^p_{n-1}
+    \end{bmatrix}, \quad
+    \bm{J}_{B2} = \begin{bmatrix}
+        \bm{J}^p_{1, y} \\ \bm{J}^p_{2, y} \\ \vdots \\ \bm{J}^p_{n-1, y},
+    \end{bmatrix}
+\end{equation}
+with $\bm{J}^p_{i, y}$ being the second row of the link path Jacobian from \eqref{eq:path_Jacobian}. The desired velocities and positions for this task are all zero,
+\begin{equation}
+    \bm{x}_{B2,d} = \dot{\bm{x}}_{B2,d} = \bm{0},
+\end{equation}
+which, with a positive definite gain matrix $\bm{\Lambda}_{B2}$, gives
+\begin{equation}
+    \label{eq:sigma_linkcross}
+    \bm{\sigma}_{B2} = -\bm{\Lambda}_{B2} \tilde{\bm{x}}_{B2} = -\bm{\Lambda}_{B2} \bm{x}_{B2}.
+\end{equation}
+The closed loop dynamics of this task can be found as
+\begin{align}
+    \label{eq:cross_track_task_dyn}
+    \dot{\bm{x}}_{B2} &= \bm{J}_{B2} \bm{\zeta} = \bm{J}_{B2}\bm{J}_A^{\dagger}\bm{\sigma}_A  + \bm{J}_{B2} \bm{N}_A \bm{J}_{B2}^\dagger \bm{\sigma}_{B2}\\
+    &= \dot{y}^p_n \bm{I}_{n-1} -\bm{J}_{B2} \bm{N}_A \bm{J}_{B2}^\dagger \bm{\Lambda}_{B2} \bm{x}_{B2}. \notag
+\end{align}
+We see that, due to the null space projectors, the cross-track dynamics of the higher-priority link will directly affect the cross-track dynamics of the remaining links. Any along-track motion of the main link will not affect the cross-track dynamics of the remaining links as the motions are orthogonal to each other.
+
+%\todo[inline]{Stress that we are looking at the example of a \emph{single} path segment.}
+
+\subsection{Lower-priority tasks}
+While both these methods nominally use all the system's DoFs, the task Jacobians may at certain singular points not be full rank. To avoid having uncontrolled DoFs at those points, we add a final task at the bottom of the task hierarchy. We suggest a posture task that straightens the vehicle as much as possible by minimizing the joint angles within the null space of the higher-priority tasks, and use the same thrid-priority task for both methods. The task is defined as
+\begin{equation}
+    \bm{x}_C = \bm{\theta}, \quad
+    \bm{J}_C = \begin{bmatrix}
+        \bm{0}_{3 \times n} \\ \bm{I}_{n-1}
+    \end{bmatrix}.
+\end{equation}
+Again, this is a regulation task with desired positions and velocities equal to zero, giving
+\begin{equation}
+    \bm{\sigma}_{C} = - \bm{\Lambda}_C \bm{x}_C,
+\end{equation}
+with $\bm{\Lambda}_C$ positive definite. In the nominal case, when the higher-priority tasks use all available DoFs, the task dynamics of this task is completely controlled by the higher priority tasks, that is
+\begin{equation}
+    \dot{\bm{x}}_C = \bm{J}_c \bm{J}_A^{\dagger} \bm{\sigma}_A +\bm{J}_c \bm{J}_B^{\dagger} \bm{\sigma}_B.
+\end{equation}
+
+Since all links will be at different points along the path, the switching from one waypoint to the next is done individually for each link. We let the switching happen once the along-track position of the link reaches a threshold defined as the distance from one waypoint to the next. A low-pass filter is applied to the desired course angle to mitigate the issues caused by the discontinuous desired angle.
+
+The total desired velocity calculated from the control law is then given by
+\begin{equation}
+    \label{eq:zeta_d}
+    \bm{\zeta}_d = \bm{J}_A^{\dagger} \bm{\sigma}_A
+    + \bm{N}_A \bm{J}_B^{\dagger} \bm{\sigma}_B
+    + \bm{N}_{AB} \bm{J}_C^{\dagger} \bm{\sigma}_C,
+\end{equation}
+with task $B$ given by eqs. \eqref{eq:link_LOS}, \eqref{eq:sigma_linkLOS} for the link LOS method, and eqs. \eqref{eq:link_cross},\eqref{eq:sigma_linkcross} for the link cross-track method.
+
+
+% \begin{table}[htp]
+%     \caption{Task hierarchy for the "link LOS" method}
+%     \label{tab:tasks_link_LOS}
+%     \centering
+%     \begin{tabular}{|c | c | c |}
+%     \hline
+%         Task & Priority & Desired value \\[5pt]
+%         \hline
+%         End-effector angle $\psi_n$& 1 & $\pi_p - \tan^{-1}(y_n^p / \Delta_n) - \beta_{c,n}$ \\[5pt]
+%         \hline
+%         End-effector velocity $ u_n $ & 1 & $1$ \\[5pt]
+%         \hline
+%         Remaining link angles $\bm{\psi}_i$ & 2 & $\pi_p - \tan^{-1}(y_i^p / \Delta_i) - \beta_{c,i}$ \\[5pt]
+%         \hline
+%         Joint angles $ \bm{\theta}$ & 3 & $\bm{0}$ \\[5pt]
+%         \hline
+%     \end{tabular}
+% \end{table}
+
+% \begin{table}[htp]
+%     \caption{Task hierarchy for the "link cross-track error" method}
+%     \label{tab:tasks_link_crosstrack}
+%     \centering
+%     \begin{tabular}{|c | c | c |}
+%     \hline
+%         Task & Priority & Desired value \\[5pt] \hline
+%         End-effector angle $\psi_n$& 1 & $\pi_p - \tan^{-1}(y_n^p / \Delta_n) - \beta_c$\\[5pt] \hline
+%         End-effector velocity $ u_n $ & 1 & $1$\\ [5pt] \hline
+%         Link cross track error $ \bm{y}^p_i$ & 2 & $ \bm{0} $ \\[5pt] \hline
+%         Joint angles $\bm{\theta} $ & 3 & $\bm{0}$ \\[5pt] \hline
+%     \end{tabular}
+% \end{table}
+
+\section{Stability Analysis}
+\label{sec:stability}
+In this section we examine the stability properties of each method using Lyapunov theory. Due to the time-varying reference of the desired heading angle, we are unable to apply the stability results from \cite{antonelli2009} directly, as this only considers regulation tasks. Instead, we consider the tasks as a cascaded system, first examining the stability of each task separately before looking at the complete system.
+
+\begin{theorem}
+    \label{thm:main_task}
+    The origin $y^p_n = 0$ of the cross-track error dynamics for the head link of the system \eqref{eq:dynamics} with control law \eqref{eq:zeta_d}, under Assumption \ref{ass:perfect_dyn} is uniformly semi-globally exponentially stable (USGES)
+\end{theorem}
+
+\begin{pf}
+As discussed in Sec. \ref{sec:main_task}, the cross-track dynamics of the head link are given by Eq. \eqref{eq:head_cross_track_dynamics} as long as Assumption \ref{ass:perfect_dyn} holds, and $\bm{J}_A$ has full row rank. The first three columns of the task Jacobian $\bm{J}_A(\bm{\theta})$, given in Eq. \eqref{eq:task_a} will consist of an adjoint mapping from the base velocities. Since this mapping always will have full rank, the total Jacobian also has full row rank, hence, the desired task velocities are also tracked perfectly globally
+\begin{equation}
+    \dot{\bm{\sigma}}_A = \dot{\bm{\sigma}}_{A,d}.
+\end{equation}
+The stability analysis of \cite{fossen2014} can thus be followed exactly, with the conclusion that the origin of the cross-track error dynamics is USGES. \qed
+\end{pf}
+
+
+\begin{proposition}
+    \label{prop:independent_B1}
+The two tasks $\bm{x}_A$ \eqref{eq:task_a} and $\bm{x}_{B1}$ \eqref{eq:link_LOS} are independent \citep{antonelli2009} for all $\bm{\xi}$. That is,
+\begin{equation}
+    \rank(\bm{J}_A^T) + \rank(\bm{J}_{B1}^T) = \rank(\begin{bmatrix}
+        \bm{J}_A^T & \bm{J}_{B1}^T
+    \end{bmatrix}),
+\end{equation}
+and the task Jacobian $\bm{J}_{B2}$ has full row rank.
+\end{proposition}
+\begin{pf}
+    This can be verified by inspection. As mentioned in Theorem \ref{thm:main_task}, $\bm{J}_A$ has full row rank due its first three columns containing an adjoint mapping. The triangular block $\bm{L}$ in $\bm{J}_{B1}$ \eqref{eq:LOS_Jacobian_tril} also has full rank at all times, and is independent of the first two and last column of $\bm{J}_A$. \qed
+\end{pf}
+
+\begin{proposition}
+    \label{prop:independent_B2}
+The two tasks $\bm{x}_A$ \eqref{eq:task_a} and $\bm{x}_{B2}$ \eqref{eq:link_cross} are independent in an open neighborhood around $\bm{\theta} = \bm{0}$, and for all $\bm{p}^n_b$ and $\bm{\psi}^n_b \neq \pi_p \pm \frac{\pi}{2}$. Further, the task Jacobian $\bm{J}_{B2}$ for task $\bm{x}_{B2}$ has full row rank in the same subset of the state space.
+\end{proposition}
+\begin{pf}
+    This holds by inspection of the respective task Jacobians. As the pose of the head link (task $\bm{x}_A$) can be controlled by controlling the base pose, the joints can be used to control the remaining links towards the path without interfering with the head link. If however, the links are oriented directly orthogonally to the path, the task Jacobian is at a singularity, with joint motions only causing along-track motion of the links.
+\end{pf}
+
+\begin{lemma}
+    \label{lem:task_B1}
+    The equilibrium $\tilde{\bm{x}}_{B1} = \bm{0}$ of the task $\bm{x}_{B1}$ \eqref{eq:link_cross} is locally exponentially stable (ES) given that the head link has converged to the path ($y^p_n = 0, \psi_n = \pi_p$). Further, this also implies ES of the origin $\bm{y}^p = \bm{0}$ of the system links for the same conditions.
+\end{lemma}
+\begin{pf}
+    Consider the Lyapunov function candidate of the task dynamics of task $\bm{x}_{B1}$ from Eq. \eqref{eq:link_LOS_dyn}
+    \begin{equation}
+        \label{eq:V_B1}
+        V(\tilde{\bm{x}}_{B1}) = \frac{1}{2} \tilde{\bm{x}}_{B2}^T\tilde{\bm{x}}_{B2}.
+    \end{equation}
+    Differentiating with respect to time gives
+    \begin{align}
+        \label{eq:V_dot_B1}
+        \dot{V}(t) &= \bm{x}_{B1}^T \dot{\bm{x}}_{B1} \\ \notag
+        &= \tilde{\bm{x}}_{B1}^T \bm{J}_{B1}\bm{J}_A^{\dagger}\bm{\sigma}_A
+        - \tilde{\bm{x}}_{B1}^T\bm{J}_{B1} \bm{N}_A \bm{J}_{B1}^\dagger \bm{\Lambda}_{B1} \tilde{\bm{x}}_{B1},
+    \end{align}
+
+    We define the matrix $\bar{\bm{\Lambda}}_{B1} = \bm{J}_{B1}\bm{N}_A \bm{J}_{B1}^\dagger \bm{\Lambda}_{B1}$, which is positive definite if task $A$ and $B$ are independent (Proposition \ref{prop:independent_B1} holds) and the gain matrix $\bm{\Lambda}_{B1}$ is positive definite \citep{antonelli2009}. Thus, if the first task has converged to its origin ($\bm{y}_n^p = 0 \implies \bm{\sigma}_A = \bm{0}$), we have
+    \begin{equation}
+        \dot{V}(t) = -\tilde{\bm{x}}_{B1}^T \bar{\bm{\Lambda}}_{B1} \tilde{\bm{x}}_{B1} < 0 \quad \forall \tilde{\bm{x}}_{B1} \neq \bm{0}\\
+    \end{equation}
+    Using \cite[Theorem 4.10]{khalil2002}, we can conclude exponential stability of the origin $\bm{x}_{B2} = \bm{0}$.
+
+    Furthermore, the origin $\bm{y}^p = \bm{0}$ of all the link cross-track dynamics corresponds with the origin $y^p_n = 0, \tilde{\bm{x}}_{B1} = \bm{0}$ of the head link cross-track error and link angle errors.
+    \qed
+\end{pf}
+
+\begin{lemma}
+    \label{lem:task_B2}
+    The equilibrium $\bm{x}_{B2} = \bm{0}$ of the task $\bm{x}_{B2}$ \eqref{eq:link_cross} is locally exponentially stable given that task $\bm{x}_A$ has converged to its desired state.
+\end{lemma}
+\begin{pf}
+    Consider the Lyapunov function candidate for the cross-track task dynamics from Eq. \eqref{eq:cross_track_task_dyn}
+    \begin{equation}
+        \label{eq:V_B2}
+        V(\bm{x}_{B2}) = \frac{1}{2} \bm{x}_{B2}^T\bm{x}_{B2}.
+    \end{equation}
+    Differentiating with respect to time gives
+    \begin{align}
+        \label{eq:V_dot_B2}
+        \dot{V}(t) &= \bm{x}_{B2}^T \dot{\bm{x}}_{B2} \\ \notag
+        %&= \bm{x}_{B2}^T \bm{J}_{B2} \bm{\zeta} \\
+        &= -\bm{x}_{B2}^T y_n^p\frac{u_{LOS}}{\sqrt{\Delta_n^2 + (y_n^p)^2}} \bm{I}_{n-1} \notag \\
+        &\qquad\qquad -\bm{x}_{B2}^T \bm{J}_{B2} \bm{N}_A \bm{J}_{B2}^\dagger \bm{\Lambda}_{B2} \bm{x}_{B2} \notag,
+    \end{align}
+    %        &= \bm{x}_{B2}^T \left(\dot{y}^p_n \bm{I}_{n-1} - \bm{J}_{B2} \bm{\zeta}\right) \\
+    % where we have utilized the fact that the cross-track error dynamics of the head link are given by \citep{fossen2014}
+    % \begin{equation}
+    %     \dot{y}_n^p = - y_n^p\frac{u_{LOS}}{\sqrt{\Delta_n^2 + (y_n^p)^2}},
+    % \end{equation} and the fact that $\bm{\zeta} = \bm{\zeta}_d$ by Assumption \ref{ass:perfect_dyn}.
+
+    Again, the matrix $\bar{\bm{\Lambda}}_{B2} = \bm{J}_{B2}\bm{N}_A \bm{J}_{B2}^\dagger \bm{\Lambda}_{B2}$ is positive definite if task $A$ and $B$ are independent (Proposition \ref{prop:independent_B2} holds) and the gain matrix $\bm{\Lambda}_{B2}$ is positive definite. Giving
+    \begin{equation}
+        \dot{V}(t) = -\bm{x}_{B2}^T \bar{\bm{\Lambda}}_{B2} \bm{x}_{B2} < 0 \quad \forall \bm{x}_{B2} \neq \bm{0},
+    \end{equation}
+    once the first task has converged. Using \cite[Theorem 4.10]{khalil2002}, we can conclude with exponential stability of the origin $\bm{x}_{B2} = \bm{0}$. \qed
+\end{pf}
+\begin{theorem}
+    \label{thm:task_b1}
+    The origin $\bm{y}^p = \bm{0}$ of the cross-track error dynamics for all links of the system \eqref{eq:dynamics} following a straight path segment with control law \eqref{eq:zeta_d}, with the link LOS method \eqref{eq:link_LOS} under Assumption \ref{ass:perfect_dyn} is locally exponentially stable (ES)
+\end{theorem}
+\begin{pf}
+    Analyzing the two main tasks as a cascaded system, we can apply \cite[Theorem 8.42]{chaillet2006}, which proves uniform local exponential stability for a cascade of subsystems with locally exponential equilibriums. To apply the theorem, we need to show that Assumptions 8.34 (Bound on interconnection term), 8.37 (Boundedness of solutions), 8.39 (UES of the driven subsystem), and 8.41 (UES of the driving subsystem) hold. We consider cross-track error dynamics of the first link \eqref{eq:head_cross_track_dynamics} as the driving subsystem, and the heading error dynamics of the remaining links \eqref{eq:link_LOS_dyn} as the driven subsystem. As mentioned, when the head link is on the path and the error in heading angle  of a link is zero, so is its cross-track error. We use $\bm{z} = \begin{bmatrix} y^p_n & \tilde{\psi}_1 & \tilde{\psi}_2 & \dots & \tilde{\psi}_{n-1} \end{bmatrix}^T$ to denote the total state of the cascade. We define $\bar{\bm{J}}_{B1} = (\bm{J}_{B1} \bm{J}_A^{\dagger})_{:3}$ as the last column of $\bm{J}_{B1} \bm{J}_A^{\dagger}$. Since only the last element of $\bm{x}_A$ affects task $\bm{x}_{B1}$ as discussed in Sec. \ref{sec:linkLOS}
+
+    The interconnection term appears in Eq. \eqref{eq:link_LOS_dyn} as
+    \begin{align}
+        \label{eq:interconnection_b1}
+        g(\bm{z}) &= \bm{J}_{B1} \bm{J}_A^{\dagger}\bm{\sigma}_a
+        = \bar{\bm{J}}_{B1} \dot{\psi}_{n, d} \\
+        &= - \bar{\bm{J}}_{B1} \frac{\Delta_n y^p_n u_{\rm LOS}}{(\Delta_n^2 + (y^p_n)^2)^{\frac{3}{2}}}
+    \end{align}
+    % = \bm{J}_{B1} \bm{J}_A^{\dagger} \begin{bmatrix}
+    %     u_{\rm LOS} \\ \bm{0} \\ \Lambda_A \tilde{\psi_n}
+    % \end{bmatrix}.
+    To satisfy Assumption 8.34, this needs to be bounded by a nondecreasing, positive function $G()$ such that
+    \begin{equation}
+        |g(\bm{z})| \leq G(|\bm{z}|) |y^p_n|,
+    \end{equation}
+    which is satisfied with $G(z) = \bar{\bm{J}}_{B1} \frac{\Delta_n u_{\rm LOS}}{(\Delta_n^2 + (y^p_n)^2)^{\frac{3}{2}}}$.
+
+    Secondly, we must show boundedness of solutions. Since the driving subsystem is USGES (and thus also UGAS) by Theorem \ref{thm:main_task}, it is also globally bounded. Further, using the Lyapunov function Eq. \eqref{eq:V_B2}, we can apply \cite[Theorem 4.18]{khalil2002} and conclude with ultimate boundedness of $\bm{x}_{B2}$ as long as the interconnection term \eqref{eq:interconnection} is bounded, which we have already shown. Finally, Assumptions 8.39 and 8.41 require exponential stability of the origins of the subsystems, which are shown in  Theorem \ref{thm:main_task} and Lemma \ref{lem:task_B1}. We therefore conclude with uniform exponential stability of the origin $\bm{y}^p = \bm{0}$ of the link cross-track dynamics. \qed
+\end{pf}
+
+\begin{theorem}
+    \label{thm:task_b2}
+    The origin $\bm{y}^p = \bm{0}$ of the cross-track error dynamics for all links of the system \eqref{eq:dynamics} following a straight path segment with control law \eqref{eq:zeta_d}, with the link cross-track method \eqref{eq:link_cross} under Assumption \ref{ass:perfect_dyn} is locally exponentially stable (ES)
+\end{theorem}
+\begin{pf}
+    The proof follows the same procedure as for Theorem \ref{thm:task_b1}, but using the cross-track error dynamics of the remaining links \eqref{eq:cross_track_task_dyn} as the driven subsystem. For this case, the interconnection term is given by
+    \begin{equation}
+        \label{eq:interconnection}
+        g(\bm{y}^p) = y_n^p\frac{u_{LOS}}{\sqrt{\Delta_n^2 + (y_e^p)^2}} \bm{I}_{n-1}.
+    \end{equation}
+    This satisfies Assumption 8.34 with $G(\bm{y}^p) = \frac{u_{LOS}}{\sqrt{\Delta_n^2 + (y_n^p)^2}}$. Using the Lyapunov function Eq. \eqref{eq:V_B2}, we can apply \cite[Theorem 4.18]{khalil2002} and conclude with ultimate boundedness of $\bm{x}_{B2}$. Finally, exponential stability of the origin of task $x_{B2}$ is shown in Lemma \ref{lem:task_B2}. We therefore conclude with uniform exponential stability of the origin $\bm{y}^p = \bm{0}$ of the vehicle's link cross-track dynamics. \qed
+\end{pf}
+
+\begin{remark}
+    We are unable to show global (or semi-global) stability properties due to the possible existence of singularities in the task Jacobian $\bm{J}_{B2}$.
+\end{remark}
+
+\section{SIMULATIONS}
+
+\label{sec:simulations}
+In this section, the proposed method is implemented in a numerical simulation of an articulated vehicle and its performance is analyzed. The vehicle used is the Eelume150 AIAUV, using the simulation model developed in \cite{schmidt-didlaukies2018}. In order to directly compare the proposed methods independent of any dynamic controller, the simulation study only considers the system kinematics.
+
+% \begin{figure}
+%     \centering
+%     \includegraphics[width=\linewidth]{figures/Eely.png}
+%     \caption{The Eelume 150 AIAUV}
+%     \label{fig:eely}
+% \end{figure}
+
+\begin{figure}
+    \centering
+    \includegraphics[width=0.95\linewidth]{figures/cross_track.png}
+    \caption{Positions of the end-effector and base using the link cross-track controller}
+    \label{fig:crosstrack}
+\end{figure}
+\begin{figure}
+    \centering
+    \includegraphics[width=0.95\linewidth]{figures/link_los.png}
+    \caption{Positions of the end-effector and base using the link-LOS controller}
+    \label{fig:link_los}
+\end{figure}
+\begin{figure}
+    \centering
+    \includegraphics[width=0.95\linewidth]{figures/pinnerobot.png}
+    \caption{Positions of the end-effector and base when only controlling the end-effector}
+    \label{fig:pinnerobot}
+\end{figure}
+
+Two different sets of tasks are compared, both attempting to follow the same path. To test the performance in different scenarios, the beginning of the path contains longer straight segments, while the end contains many rapid turns. The results using the two different control approaches presented in Section \ref{sec:method} are shown in Figs. \ref{fig:crosstrack} and \ref{fig:link_los}, and for comparison's sake, the result of only controlling the head link is shown in Figure~\ref{fig:pinnerobot}. It is clear that the cross-track method has significantly better performance than the other two when comparing the base link positions. As expected, the head link behaves virtually identically for both methods, as it is the highest priority task and thus should be unaffected by the remaining control effort.
+
+For a more quantitative comparison, Figure~\ref{fig:error} shows the total tracking error of each of the methods, with the baseline being to only control the head link. The total tracking error is defined as $\sqrt{\sum_i^n{(y_i^p)^2}}$, that is the sum of squares of the cross-track errors of each link. It is clear that the cross-track method vastly outperforms the two alternatives, and that the link LOS method only slightly improves over the baseline. This might be due to how the tasks are expressed, with the link cross-track task being less restricted by the null space projection compared to the link LOS task.
+
+% There may be two main reasons contributing to the high performance of the cross-track based method. The first is that the links will all travel in the direction of the head link, in effect causing each link except the first to have a nonzero crab angle, $\beta_c$, and converging to the path only by slowly straightening out each joint. The quick changes between waypoint will thus not allow enough time for converging.
+
+\begin{figure}
+    \label{fig:error}
+    \centering
+    \includegraphics[width=\linewidth]{figures/tracking_error.png}
+    \caption{Comparison of the total tracking error}
+\end{figure}
+\section{CONCLUSIONS AND FUTURE WORK}
+\label{sec:conclusions}
+
+In this article, a path following scheme that combines velocity-level CLIK task priority for redundancy resolution and LOS guidance for articulated vehicles was presented. The redundant DoFs of the articulated vehicle are used to keep all links on the path at all times, and is shown to decrease the total deviation from the path compared to using LOS guidance without any modifications. The proposed method was validated in simulation with two different sets of proposed tasks for redundancy resolution.
+
+Future work will include experimental verification of the results and extending the proposed method to the three-dimensional case.
+
+% The phenomenon observed in simulations that controlling the angle of the head link also caused sway motion should also be investigated further. Perhaps using a dynamic level controller or another set of tasks
+% It is also possible to consider other redundancy resolution schemes, utilizing for example methods on the dynamic level \citep{saebo2022} or using optimization schemes instead of null space projectors. Trying to minimize the total deviation from the path would seem to lend itself well to optimization, for example using an MPC scheme.
+
+
+% \begin{ack}
+% Many thanks to PHD student Markus Iversflaten
+% \end{ack}
+
+\bibliography{bibliography}             % bib file to produce the bibliography
+                                                     % with bibtex (preferred)
+
+%\begin{thebibliography}{xx}  % you can also add the bibliography by hand
+
+%\bibitem[Able(1956)]{Abl:56}
+%B.C. Able.
+%\newblock Nucleic acid content of microscope.
+%\newblock \emph{Nature}, 135:\penalty0 7--9, 1956.
+
+%\bibitem[Able et~al.(1954)Able, Tagg, and Rush]{AbTaRu:54}
+%B.C. Able, R.A. Tagg, and M.~Rush.
+%\newblock Enzyme-catalyzed cellular transanimations.
+%\newblock In A.F. Round, editor, \emph{Advances in Enzymology}, volume~2, pages
+%  125--247. Academic Press, New York, 3rd edition, 1954.
+
+%\bibitem[Keohane(1958)]{Keo:58}
+%R.~Keohane.
+%\newblock \emph{Power and Interdependence: World Politics in Transitions}.
+%\newblock Little, Brown \& Co., Boston, 1958.
+
+%\bibitem[Powers(1985)]{Pow:85}
+%T.~Powers.
+%\newblock Is there a way out?
+%\newblock \emph{Harpers}, pages 35--47, June 1985.
+
+%\bibitem[Soukhanov(1992)]{Heritage:92}
+%A.~H. Soukhanov, editor.
+%\newblock \emph{{The American Heritage. Dictionary of the American Language}}.
+%\newblock Houghton Mifflin Company, 1992.
+
+%\end{thebibliography}
+
+% \appendix
+% \section{A summary of Latin grammar}    % Each appendix must have a short title.
+% \section{Some Latin vocabulary}              % Sections and subsections are supported
+                                                                         % in the appendices.
+\end{document}
