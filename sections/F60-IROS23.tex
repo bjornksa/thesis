@@ -1,13 +1,15 @@
 % \providecommand{\main}{..}
 \documentclass[../main.tex]{subfiles}
+
+\begin{document}
+
     Hardware-in-the-loop simulation (HILS) allows a more realistic evaluation of control approaches than what is possible with pure software simulations, but without the actual complexity of the complete system. This is important  for some complex systems such as orbital robots, where testing of the system is typically not possible after its launch, and an on-ground replica is used to validate the performance of such a system. In this article, an impedance-matching approach is presented to match the end-effector dynamics of a fixed-base robot manipulator with that of a target vehicle-manipulator system (VMS), while taking into account the redundant nullspace dynamics in a connected real-time simulation framework. This approach ensures that the forces and torques exerted by the system on the environment matches with that of the simulated system. The contact wrenches used in our approach are not obtained from numerical simulations, but rather from real physical interaction, which is one of the main advantages of our approach. The effectiveness of our method is validated by demonstrating various physical interaction tasks with the environment, using a suspended aerial manipulator as the target system.
-\end{abstract}
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \section{Introduction}
 \label{sec:intro}
-Vehicle-manipulator systems (VMS) combine the benefits of traditional fixed-base manipulators (FBM), with the versatility of a mobile base. In some applications such as orbital \cite{mishra2020}, or underwater \cite{antonelli2018} robotics, a mobile base is required to reach the working area. Mobile robots often work in environments that are hazardous or unreachable by humans, besides their widespread use in common industrial and household automation tasks where it is not constrained to a fixed location. Examples include space robotics \cite{flores-abad2014} and underwater intervention \cite{simetti2020}.
+Vehicle-manipulator systems (VMS) combine the benefits of traditional fixed-base manipulators (FBM), with the versatility of a mobile base. In some applications such as orbital \cite{mishra2020}, or underwater \cite{Antonelli2018} robotics, a mobile base is required to reach the working area. Mobile robots often work in environments that are hazardous or unreachable by humans, besides their widespread use in common industrial and household automation tasks where it is not constrained to a fixed location. Examples include space robotics \cite{flores-abad2014} and underwater intervention \cite{simetti2020}.
 %, and supervised teleoperation in harsh environments such as the particle accelerator at CERN \cite{dicastro2018}.
 
 In many cases, full scale tests of the VMS are prohibitively expensive or practically impossible to perform before the system is put into use. Computer simulations allow initial tests of software and controller design, but are limited in several ways. Such simulations usually are based on simplified models of the system and the environment, which can possibly omit some important information such as the contact dynamics that are hard to model accurately \cite{skrinjar2018}. Additionally, completely numerical simulations do not allow the testing of the components used during the actual experiments. It is therefore common to use hardware-in-the-loop simulations (HILS), where physical components of the actual system are integrated into the simulation \cite{bacic2005, kiesbye2019hardware}. 
@@ -412,7 +414,7 @@ $\bm{K_D}$  & 30.3 & 20.1 & 23.3 & 6.5 & 11 & 12 \\
 %\cor{The first scenario is validated with both configuration of the VMS, in order to demonstrate the generic nature of our approach. However, only configuration 1 of the VMS was used to validate the second and third scenario, even though the performances of both the configurations were found to be similar which is not shown in the paper. }
 For the first scenario, both configurations of the VMS are tested, while only configuration 1 is shown for the second and third scenarios, as the performance was found to be similar for both configurations.
 \subsection{Trajectory Tracking}
-\begin{comment}
+
 \begin{figure}[h]
 \begin{subfigure}{0.5\textwidth}
   \centering
@@ -431,7 +433,7 @@ For the first scenario, both configurations of the VMS are tested, while only co
 \caption{End-effector position comparison along the $x-$ and $z-$ axis of the FBM and the VMS for the  trajectory tracking task, utilizing the two configurations.}
 \label{fig:ee_track}
 \end{figure}
-\end{comment}
+
 
 \begin{figure}[b]
 \begin{subfigure}{\linewidth}
@@ -453,18 +455,15 @@ For the first scenario, both configurations of the VMS are tested, while only co
 %\label{fig:ee_track}
 \end{figure}
 
-\begin{comment}
 \begin{figure}[t]
     \centering
     \includegraphics[scale=0.32]{figures/IROS23/Track_Errors_new_mod.eps}
     \caption{Errors between the reference $\bm{\hat{x}_{e,d}}$ and the  end-effector pose $\bm{\hat{x}_{e}}$ of the VMS, for the given trajectory tracking task, for Configuration 1 of the VMS. }
     \label{fig:ee_track_error}
 \end{figure} \par
-\end{comment}
+
 For the trajectory tracking task, a sinusoidal signal of amplitude 0.15 m and a frequency of 0.6 rad/s is provided as the reference for the $x$- and $z$-axis position, represented in the global coordinate frame. The end-effector position along the $y$-axis and its orientation  are commanded to remain in their initial configurations. The results of the tracking task for the $x$-axis and $z$-axis are shown in Fig. \ref{fig:ee_track_1} for configuration 1 of the VMS, and in Fig. \ref{fig:ee_track_2} for configuration 2. These plots show that the PD+ controller in \eqref{eq:vms_control} allows the VMS end-effector to successfully track the given reference trajectory, with a tracking error of less than 0.1 m for the position and 0.1 rad for the orientation  (Fig. \ref{fig:ee_track_error}). A possible source of this error is the use of a force estimator at the end-effector instead of a physical sensor, due to which the bias and noises from the estimator gets reflected in the control signals. These errors can be reduced by an effective tuning or potentially be eliminated by the use of integral action in the controller, which is not addressed in this paper. We also observe that the rotational error about the $y$-axis ($\theta$) is similar to that of the translational $x$- and $z$- axis errors, due to the coupling of these axes in the end-effector dynamics. 
 
-\begin{comment}
-    
 \begin{figure}[h]
     \centering
     \includegraphics[width=\linewidth]{figures/IROS23/Track_Joints_newest.eps}
@@ -474,7 +473,7 @@ For the trajectory tracking task, a sinusoidal signal of amplitude 0.15 m and a 
 \end{figure}
 The evolution of the joint angles of the VMS in configuration 1 and the FBM during the given trajectory tracking task is plotted in Fig. \ref{fig:q_track}. Since the end-effector reference lies in the $x-z$ plane, the FBM only uses the joints $q_2$, $q_4$ and $q_6$ to achieve the desired motion. The VMS uses the same manipulator joints, in addition to its base joint $\hat{q}_2$ to achieve the same end-effector motion.
 The small movements in the base joint $\hat{q}_2$ correspond to a significant movement of the end-effector due to the length of its rope. 
-\end{comment}
+
 
 The nullspace velocities corresponding to the redundant DoF are plotted in Fig. \ref{fig:vn_track}. The fixed-base robot has one extra DoF, and thus only one nullspace velocity whereas the VMS has four degrees of redundancy. We observe that the nullspace velocities of the VMS oscillates with a frequency matching the reference signal. However, the variation in the redundant DoF does not affect the end-effector dynamics due to the appropriate selection of the nullspace operator $\bm{N}$ in \eqref{eq:nullspace}.
 \begin{figure}[h]

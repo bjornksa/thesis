@@ -238,7 +238,6 @@ and $\bm{\tau}_{\delta}$ is defined equivalently to $\bm{\tau}_{\mu}$, but cance
     For systems without hydrodynamic effects, this simplifies to the expression given in \cite{dietrich2020}:
     \begin{equation}
         \label{eq:tau_no_damping}
-
         \bm{\tau} = \bm{g} + \bm{\tau}_\mu + \sum_{i=1}^{r}\bm{N}_i \bm{J}_i^T \bm{F}_{i,{\rm ctrl}}
     \end{equation}
 \end{remark}
@@ -747,7 +746,7 @@ To investigate the robustness to modelling errors, the control laws were impleme
     \end{tabular}
 \end{table}
 
-\begin{figure}[]
+\begin{figure}[htb]
     \centering
     \vspace{5pt}
     \includegraphics[width=0.9\linewidth]{figures/CCTA/trajectories_collected_crop.pdf}
@@ -755,7 +754,7 @@ To investigate the robustness to modelling errors, the control laws were impleme
     \label{fig:trajectories}
 \end{figure}
 
-\begin{figure}[]
+\begin{figure}[htb]
     \centering
     \vspace{5pt}
     \includegraphics[width=0.9\linewidth]{figures/CCTA/init_error/abs_error_comparison.eps}
@@ -763,7 +762,7 @@ To investigate the robustness to modelling errors, the control laws were impleme
     \label{fig:abs_err}
 \end{figure}
 
-\begin{figure}
+\begin{figure}[htb]
     \centering
     \includegraphics[width=0.9\linewidth]{figures/CCTA/init_error/forces_torques.eps}
     \caption{Applied thruster forces and joint torques for the control laws}
@@ -803,7 +802,6 @@ To enable autonomous completion of subsea intervention tasks, a controller that 
     It is $\Omega$-UAS if it is $\Omega$-US and uniformly attractive on $\Omega$.
 \end{definition}
 
-\begin{samepage}
 We here restate \cite[Theorem 2]{Wang2008} for completeness.
 \begin{theorem}
     \label{thm:omega_uas}
