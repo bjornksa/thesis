@@ -7,8 +7,7 @@ In this work a control framework is proposed that takes this coupling effect int
 The proposed approach generalizes previous works using the Generalized Jacobian matrix to allow the completion of several prioritized tracking tasks. Control allocation is performed in a manner ensuring that the thrusters are used only for controlling the overall position of the VMS, while the joints are used for tasks requiring higher accuracy. % within its current workspace.
 The set in which all tracking error dynamics are zero is shown to be uniformly asymptotically stable, and the performance of the proposed control method is validated in a simulation study.
 
-\vspace{-15pt}
-\section{Introduction}\vspace{-9pt}
+\section{Introduction}
 %\todo[inline,color=cyan!15]{Exploring and interacting in/with the ocean is cool. UVMSs are nice for this.}
 Uncrewed vehicles are increasingly used for exploring the oceans and gain access to their resources, for example to survey, explore caves or shipwrecks, or for inspection, maintenance and repair of subsea infrastructure. \Glspl{uvms} are vehicles equipped with some manipulator, frequently a jointed arm, enabling them to interact with their surroundings.
 %\todo[inline,color=cyan!15]{Smaller and lighter vehicles have better access, and are easier (and therefore cheaper) to deploy. An extreme case of a vehicle which is "light compared to its arm" is the AIAUV which is just an arm, and doesn't even have a natural "vehicle base" since all links are of similar size and thrusters are placed on multiple links.}
@@ -21,24 +20,21 @@ Smaller, lighter vehicles are easier and cheaper to deploy, and small or slender
 The literature on control of \glspl{uvms} has focused largely on \glspl{vms} with a large, heavy vehicle base, and control schemes in which coordination of the vehicle and manipulator is performed on a kinematic level only, while the dynamics of each are controlled separately~\citep{Antonelli2018}.
 \begin{figure}[tb]
     \centering
-    \vspace{-8pt}
-    \includegraphics[width=0.85\linewidth,trim={0 27.3cm 0mm 4mm},clip]{fig/robots.pdf}
+    \includegraphics[width=0.85\linewidth,trim={0 27.3cm 0mm 4mm},clip]{figures/GJM/robots.pdf}
     % \begin{subfigure}[T]{0.28\linewidth}
-    %         \includegraphics[width=\linewidth,trim={0.1 -1.6cm 0.2cm 0cm},clip]{fig/fixed.pdf}\vspace{-3pt}
+    %         \includegraphics[width=\linewidth,trim={0.1 -1.6cm 0.2cm 0cm},clip]{figures/GJM/fixed.pdf}\vspace{-3pt}
     %         %\caption{}
     % \end{subfigure}
     % \begin{subfigure}[T]{0.28\linewidth}
-    %         \includegraphics[width=\linewidth,trim={0 0 0 0.35cm},clip]{fig/heavy.pdf}\vspace{-3pt} %trim={0 0 0 1.35cm}
+    %         \includegraphics[width=\linewidth,trim={0 0 0 0.35cm},clip]{figures/GJM/heavy.pdf}\vspace{-3pt} %trim={0 0 0 1.35cm}
     %         %\caption{}
     % \end{subfigure}
     % \begin{subfigure}[T]{0.28\linewidth}
-    %         \includegraphics[width=\linewidth,trim={0 0 0 0cm},clip]{fig/light.pdf}\vspace{-3pt}
+    %         \includegraphics[width=\linewidth,trim={0 0 0 0cm},clip]{figures/GJM/light.pdf}\vspace{-3pt}
     %         %\caption{}
     % \end{subfigure}
-    \vspace{-7pt}
-    %\includegraphics[width=\linewidth,trim={0 0 0 0},clip]{fig/sketch1.pdf} % trim: left bottom right top
+    %\includegraphics[width=\linewidth,trim={0 0 0 0},clip]{figures/GJM/sketch1.pdf} % trim: left bottom right top
     \caption{The same joint motion performed by (left to right): a fixed-base manipulator, a free-floating \gls{vms} with a heavy base, and a free-floating \gls{vms} with a light base.}
-    \vspace{-2pt}
     \label{fig:motion}
 \end{figure}
 Such an approach is satisfactory for these \glspl{vms} with a large, heavy base which does not experience much disturbance from the manipulator. However, free-floating \glspl{vms} with a comparably lighter vehicle base are more vulnerable to such disturbances, sometimes referred to as reaction forces~\citep{Umetani1989}, where the motion of the manipulator arm induces a motion of the vehicle base. This occurs because it is the \gls{cg} of the vehicle that stays in place, while the joint motion changes the position of the vehicle base relative to the \gls{cg}. For \glspl{vms} with a light base, the manipulator arm constitutes a larger part of their total mass, and therefore they are more vulnerable to this reaction effect. The effect is illustrated in Fig.~\ref{fig:motion}, which shows the result of the same joint motion on a fixed-base manipulator, a free-floating \gls{vms} with a heavy base, and a free-floating \gls{vms} with a relatively light or no distinct base. Such effects were also observed by~\cite{Borlaug2021} in experiments with an \gls{aiauv}, in which joint motion at the front of the vehicle disturbed the pose of its backmost link, despite controlling its pose using a scheme designed to be robust against disturbances and uncertainties. %, in which the backmost link of the \gls{aiauv} was chosen to act as vehicle base, and its pose was controlled while a joint was used to move the frontmost link. Even when using a sliding mode control algorithm which is designed to be robust against disturbances, the joint motion led to errors in the base pose, and larger and more variable thrust inputs were required to control the base while the joint was moving.
@@ -119,16 +115,16 @@ where $\bm{M}_b(\bm{\theta}) \in \mathbb{R}^{6 \times 6},\, \bm{M}_{bm}(\bm{\the
     \end{bmatrix}
 \end{equation}
 where $\bm{B}_{\textrm{thr}}(\bm{\theta}) \in \mathbb{R}^{6\times m}$.
-\begin{ass}\label{ass:B}
+\begin{assumption}\label{ass:B}
     The vehicle is fully actuated at all times, i.e.~$\textrm{rank} (\bm{B}_{\textrm{thr}}(\bm{\theta}) ) =  6 \ \forall \bm{\theta}$.
-\end{ass}
+\end{assumption}
 %\todo[inline]{Optionally: Go deeper into structure of $B_{thr}$ to see if requiring $Ad_{cb}^{-\top}(\bm{\theta}) B_{thr}(\bm{\theta})$ to have full rank relaxes the assumption. If yes, adjust control allocation section accordingly}
-\begin{rem}
+\begin{remark}
      Assumption~\ref{ass:B} is an assumption that the \gls{uvms} is well designed, i.e. equipped with a sufficient number of actuators to ensure controllability of the base motion in any configuration of the \gls{uvms}.
-\end{rem}
-\begin{rem}
+\end{remark}
+\begin{remark}
     For a \gls{uvms} with all thrusters placed on the base, $\bm{B}_{\theta}(\bm{\theta}) = 0 \ \forall\bm{\theta}$.
-\end{rem}
+\end{remark}
 
 
 % In which we generalise the generalised Jacobian
@@ -143,13 +139,13 @@ A task hierarchy comprised of $q \in \mathbb{N}$ tasks is considered, where each
     \bm{x}_i = \bm{f}_i (\bm{\xi})
 \end{equation}
 of dimension $m_i$. As in~\cite{Dietrich2020}, the choice of tasks is subject to the following assumptions:
-\begin{ass}\label{ass:dof}
+\begin{assumption}\label{ass:dof}
     The tasks are simultaneously feasible and the total dimension of the tasks is equal to the number  of \glspl{dof} of the system s.t. $\sum_{i=1}^{q} m_i = 6+n$.
-\end{ass}\vspace{-5pt}
+\end{assumption}\vspace{-5pt}
 For each task, the objective is to follow a given desired trajectory $\bm{x}_{i,d}(t)$, which we gather into $\bm{x}_d(t) = [ \bm{x}_{1,d}(t)^\top, ..., \bm{x}_{q,d}(t)^\top ]^\top$.
-\begin{ass}\label{ass:nonsingular}
+\begin{assumption}\label{ass:nonsingular}
     The desired trajectory $\bm{x}_d(t)$ avoids any singularities, and there exists an open neighborhood around the desired trajectory in the state space which is also free of singularities.
-\end{ass}\vspace{-5pt}
+\end{assumption}\vspace{-5pt}
 Assumptions~\ref{ass:dof} and~\ref{ass:nonsingular} ensure that the augmented Jacobian for the full stack of tasks is invertible in a neighbourhood of the desired trajectory, which is necessary to realize the control input to be introduced later, and for the later stability analysis to be valid.
 %\todo[inline]{This probably excludes e.g. trajectories which require the end-effector to be at the boundary of the current workspace, which is not a huge problem for a \gls{vms} but further motivates our work on efficiently repositioning the workspace}
 %
@@ -243,9 +239,9 @@ where $\bm{Ad}_{cb}$ denotes the adjoint of the transformation describing the po
     \bm{v}_1 = \bm{X}(\bm{\xi}) \bm{h} 
 \end{equation}
 where $\bm{X}(\bm{\xi}) \in \mathbb{R}^{6\times 6}$ is invertible in the considered workspace. We will refer to tasks with velocity as given by~\eqref{eq:generalised_v1} as momentum-like.
-\begin{rem}
+\begin{remark}
     Such tasks include the velocity of the \gls{cg} together with rotational momentum as in~\cite{Giordano2018}, or a generalized average velocity.% as used by~\cite{Giordano2021} to decompose the total end-effector velocity.
-\end{rem}\vspace{-5pt}
+\end{remark}\vspace{-5pt}
 %\todo[inline]{The task velocity $\bm{v_1}$ as given by~\eqref{eq:generalised_v1} is not necessarily integrable, in particular its last three elements corresponding to rotation. This means that there may not exist a task variable $\bm{x}_1$ s.t.~$\dot{\bm{x}}_1 = \bm{X}(\bm{\xi}) \bm{h}$ with an invertible $\bm{X}(\bm{\xi})$ (at least not everywhere)}
 
 By inserting~\eqref{eq:h} into~\eqref{eq:generalised_v1} we obtain
@@ -322,12 +318,12 @@ We  base our tracking controller on our previous work~\citep{Saeboe2022}, with s
 %In this section we present the tracking control law from our previous work~\citep{Saeboe2022}, and we present a control allocation algorithm which ensures a triangular structure of the mapping from virtual task inputs to actuators. We also present modifications of the control law required to deal with the case when one of the tasks is only to control momentum to zero, i.e.~part of a task is only a velocity-level objective, and we analyse the stability of the resulting closed-loop system.
 
 As our primary task, like~\cite{Giordano2018} we choose to control the position of the \gls{cg}, denoted $\bm{p}_{\textrm{cg}}$, and the total rotational momentum about a frame located at the \gls{cg} and with axes which are fixed relative to the inertial axes. In order to relate the velocity of the \gls{cg} to the total momentum in an underwater setting, we make the following assumption in the control design and analysis:
-\begin{ass}\label{ass:added_mass}
+\begin{assumption}\label{ass:added_mass}
     The added mass effects are negligible.
-\end{ass}
-\begin{rem}
+\end{assumption}
+\begin{remark}
     The presence of added mass effects will result in a disturbance which is not compensated directly by the controller, nor taken into account in the analysis. Since knowledge of the added mass effects will be approximate at best, and unnecessarily complicate the notion of controlling the center of mass, we let this disturbance be dealt with by the general robustness of the controller. This will be further discussed in connection with simulation results in Section~\ref{sec:simulation}.
-\end{rem}\vspace{-5pt}
+\end{remark}\vspace{-5pt}
 %
 The task velocity $\bm{v}_1 = \left[\dot{\bm{p}}_{\textrm{cg}}^\top, \bm{h}_{\textrm{rot}} \right]^\top$, where $\bm{h}_{\textrm{rot}}$ is the rotational momentum, is then given by~\eqref{eq:generalised_v1} with
 \begin{equation}
@@ -434,9 +430,9 @@ The choice~\eqref{eq:F1ctrl} corresponds to~\eqref{eq:Fictrl} with $\bm{h}_{\tex
 %    \bm{F}_{r,\textrm{ctrl}} = -\bm{D}_r \bm{h}_{\textrm{rot}}
 %\end{equation}
 
-\begin{rem}
+\begin{remark}
     If the reference for the position of \gls{cg} is also chosen constant, and in the absence of external damping or hydrostatic forces, the control law given by~\eqref{eq:F},~\eqref{eq:Fictrl} for the momentum task reduces to the same one as in~\citep{Giordano2018} with total proportional gain $\bm{D}_{1,p} \bm{\Lambda}_{1,p} + \bm{K}_{1,p}$. If the lower-priority tasks are chosen to be only the regulation of end-effector pose as in the scenario considered by~\cite{Giordano2018}, the complete input~\eqref{eq:F},~\eqref{eq:Fictrl} for the end-effector task differs only by the cancellation of Coriolis terms through $\bm{F}^*_{\mu}$.%, which is not done by~\cite{Giordano2018}.
-\end{rem}
+\end{remark}
 %
 \vspace{-8pt}
 \subsection{Control allocation}\label{sec:alloc}\vspace{-8pt}
@@ -472,9 +468,9 @@ Using this and inserting~\eqref{eq:F} for $\bm{F}$ into~\eqref{eq:alloc}, we can
 %\end{equation}
 %due to the blocks on the diagonal of $\bar{\bm{J}}^{-\top}$ being square and invertible, and due to $\bm{B}_{\textrm{thr}}$ having rank 6 s.t.~$\bm{B}_{\textrm{thr}}\bm{B}_{\textrm{thr}}^\dag = \bm{I}_6$.
 
-\begin{rem}
+\begin{remark}
     This control allocation scheme effectively requires the joints to counter the torques exerted on them by the thrusters, and therefore relies on the joint motors being powerful enough to achieve that.
-\end{rem}
+\end{remark}
 
 %\todo[inline]{Say something about why we choose our own controller rather than~\citep{Garofalo2020}? The only differences are in the damping term (is it wrt desired "relative" velocity or desired total task velocity) and the extra proportional term which makes our version more like a backstepping controller and should intuitively be better (if one wants to stick to continuous schemes). At each task level, we get some robustness from ES against disturbances from the top-down tasks. }
 
@@ -497,21 +493,21 @@ which is the subset of the state space in which the first task is completed. We 
 \end{equation}
 for $i=2,...,q$. From the expression~\eqref{eq:si} for $\bm{s}_i$ it follows that in the set $\mathcal{A}_i$ where $\tilde{\bm{x}}_i = 0$, $\dot{\tilde{\bm{x}}}_i =  \bm{s}_i = 0$.  Thus $\mathcal{A}_i$ is the subset of the state space in which all tasks up to and including task $i$ are completed. The control objective is then to asymptotically stabilize the set $\mathcal{A}_q$ in which all tasks are completed. 
 
-\begin{ass}\label{ass:lipschitz}
+\begin{assumption}\label{ass:lipschitz}
     The dynamics~\eqref{eq:vms} in closed-loop with the control input given by~\eqref{eq:F},~\eqref{eq:Fictrl},~\eqref{eq:F1ctrl},~\eqref{eq:alloc} are Lipschitz.
-\end{ass}
+\end{assumption}
 %
-\begin{rem}
+\begin{remark}
     Assumption~\ref{ass:lipschitz} is necessary in order to apply stability theorems from~\citet{Maggiore2023}, and is a common assumption~\citep{Dietrich2020}. It is a reasonable assumption for the robot dynamics~\eqref{eq:vms}, but may restrict the choice of tasks.
-\end{rem}
+\end{remark}
 %
-\begin{propos}\label{prop:UAS}
+\begin{proposition}\label{prop:UAS}
     Consider the dynamics~\eqref{eq:vms} in closed-loop with the control input given by~\eqref{eq:F},~\eqref{eq:Fictrl},~\eqref{eq:F1ctrl},~\eqref{eq:alloc}, and subject to Assumptions~\ref{ass:B}-\ref{ass:lipschitz}. Then the set $\mathcal{A}_q$ is \gls{uas}. 
-\end{propos}
+\end{proposition}
 
 %\todo[inline]{A word on analysis: if we disregard attitude for the state, we can use Wang et al. (2008) to show stability of the origin. Otherwise (since attitude evolves on a compact set anyway) we can use~\citep{Maggiore2023} to show stability. If we can show boundedness in the absence of singularities, the latter option gives us UGAS (in the absence of singularities).}
 \vspace{-7pt}
-\begin{pf}
+\begin{proof}
 Since the attitude and joint angles $\bm{q}$, $\bm{\theta}$ evolve on compact manifolds, the set $\mathcal{A}_q$ is compact. The closed-loop dynamics of the primary task given by~\eqref{eq:x_i_ddot},~\eqref{eq:F1ctrl},~\eqref{eq:p_cgr} are
 \vspace{-5pt}
 \begin{subequations}\label{eq:y1_dyn}
@@ -594,7 +590,7 @@ for $\bm{z} \in \mathcal{A}_{i-1}$, where $\Vert \cdot \Vert_{\mathcal{A}_j}$ de
 \subsubsection{Step 3b)} Since $\mathcal{A}_q$ is \gls{uas} relative to $\mathcal{A}_i$, and 
 $\mathcal{A}_i$ is \gls{lus} near $\mathcal{A}_q$ and \gls{t0ua} near $\mathcal{A}_q$, both relative to $\mathcal{A}_{i-1}$, by~\cite[Theorem 18]{Maggiore2023} $\mathcal{A}_q$ is \gls{uas} relative to $\mathcal{A}_{i-1}$.
 \hfill$\qed$
-\end{pf}\vspace{-7pt}
+\end{proof}
 %\todo[inline]{\cite[Remark 21]{Maggiore2023} on applying the results relatively to a subset refers to properties holding for initial states within this subset. Our $\mathcal{A}_i$'s are positively invariant, so initial states restricted to $\mathcal{A}_i$ lead to trajectories within $\mathcal{A}_i$ and we're all good.}
     
 %\todo[inline]{Future continuation: If we can show boundedness in the absence of singularities, it gives us UGAS (in the absence of singularities) as in (Garofalo \& Ott (2020)).}
@@ -616,15 +612,15 @@ Fig.~\ref{fig:rolly} illustrates the placement and direction of thrusters and jo
 \begin{figure}[b]
     \centering
     \vspace{-1pt}
-    \includegraphics[width=0.8\linewidth,trim={0.1cm 0.18cm 0.1cm 0.2cm},clip]{fig/rolly_numbered.pdf}\vspace{-10pt}
-    %\includegraphics[width=0.7\linewidth,trim={0.85cm 0.9cm 0.75cm 0.4cm},clip]{fig/rolly.pdf}
+    \includegraphics[width=0.8\linewidth,trim={0.1cm 0.18cm 0.1cm 0.2cm},clip]{figures/GJM/rolly_numbered.pdf}\vspace{-10pt}
+    %\includegraphics[width=0.7\linewidth,trim={0.85cm 0.9cm 0.75cm 0.4cm},clip]{figures/GJM/rolly.pdf}
     \caption{Illustration of the axes of rotation of joints (blue) and thruster placement and directions (orange) for the simulated AIAUV. The placement of thruster no.~5 mirrors that of no.~4.}
     \label{fig:rolly}
 \end{figure}
 %
 \begin{figure*}[t]
     \centering
-    \includegraphics[width=\textwidth,trim={0 0.55cm 0 0}]{fig/task_trajectories_2.eps}\vspace{-3pt}
+    \includegraphics[width=\textwidth,trim={0 0.55cm 0 0}]{figures/GJM/task_trajectories_2.eps}\vspace{-3pt}
     \caption{Task trajectories, with their corresponding reference trajectories as dashed lines}\vspace{-3pt}
     \label{fig:tasks}
 \end{figure*}
@@ -632,14 +628,14 @@ Fig.~\ref{fig:rolly} illustrates the placement and direction of thrusters and jo
 \begin{figure}
     \centering
     \vspace{-2pt}
-    \includegraphics[width=0.91\linewidth,trim={0 0.6cm 0 0.25cm}]{fig/forces.png}\vspace{-1pt}
+    \includegraphics[width=0.91\linewidth,trim={0 0.6cm 0 0.25cm}]{figures/GJM/forces.png}\vspace{-1pt}
     \caption{Joint angles and applied torques and thruster forces}\vspace{-2pt}
     \label{fig:inputs}
 \end{figure}
 
 \begin{figure}
     \centering
-    \includegraphics[width=0.91\linewidth,trim={0 0.6cm 0 0.25cm}]{fig/abs_error.png}\vspace{-4pt}
+    \includegraphics[width=0.91\linewidth,trim={0 0.6cm 0 0.25cm}]{figures/GJM/abs_error.png}\vspace{-4pt}
     \caption{Error norms}
     \label{fig:errors}
 \end{figure}

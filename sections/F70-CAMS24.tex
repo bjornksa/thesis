@@ -44,7 +44,7 @@ We consider a planar VMS with $n-1$ revolute joints and $n$ links. The complete 
 where $x_b, y_b,$ and $\psi_b$ are the $x$ and $y$ position and rotation of the base link relative to an inertial frame $\{n\}$ and $\theta_i$ is the angle of link $i$ for $i = 1, \ldots, n$. We use the notation $(\cdot)_{ab}^c$ to denote the pose of $\{a\}$ relative to $\{b\}$, expressed in $\{c\}$, simplifying to $(\cdot)^a_{b}$ when $\{a\} = \{c\}$. To describe the configurations of each link of the vehicle, we use a reference frame rigidly attached to the center of each link, with positive $x$-direction towards the front of the link. The base frame is denoted $\{b\}$, while for the remaining links we write $\{ i\}$, where $i$ is the number of the link, with the base being number one. The final link is link number $n$, and we refer to it as the \emph{head} link. See Figure~\ref{fig:VMS} for an example of a system with two links.
 \begin{figure}
     \centering
-    \includegraphics[width=\linewidth]{diagrams/ref_frames_2.png}
+    \includegraphics[width=\linewidth]{figures/pathfollowing/ref_frames_2.png}
     \caption{Reference frames for an articulated vehicle with two links}
     \label{fig:VMS}
 \end{figure}
@@ -171,7 +171,7 @@ $x_j^n, y_j^n$, being the coordinates of waypoint number $j$. The cross-track er
 \label{sec:method}
 \begin{figure*}
     \centering
-    \includegraphics[width=0.9\linewidth]{diagrams/block.png}
+    \includegraphics[width=0.9\linewidth]{figures/pathfollowing/block.png}
     \caption{Proposed control architecture}
     \label{fig:block}
 \end{figure*}
@@ -423,13 +423,13 @@ In this section we examine the stability properties of each method using Lyapuno
     The origin $y^p_n = 0$ of the cross-track error dynamics for the head link of the system \eqref{eq:dynamics} with control law \eqref{eq:zeta_d}, under Assumption \ref{ass:perfect_dyn} is uniformly semi-globally exponentially stable (USGES)
 \end{theorem}
 
-\begin{pf}
+\begin{proof}
 As discussed in Sec. \ref{sec:main_task}, the cross-track dynamics of the head link are given by Eq. \eqref{eq:head_cross_track_dynamics} as long as Assumption \ref{ass:perfect_dyn} holds, and $\bm{J}_A$ has full row rank. The first three columns of the task Jacobian $\bm{J}_A(\bm{\theta})$, given in Eq. \eqref{eq:task_a} will consist of an adjoint mapping from the base velocities. Since this mapping always will have full rank, the total Jacobian also has full row rank, hence, the desired task velocities are also tracked perfectly globally
 \begin{equation}
     \dot{\bm{\sigma}}_A = \dot{\bm{\sigma}}_{A,d}.
 \end{equation}
 The stability analysis of \cite{fossen2014} can thus be followed exactly, with the conclusion that the origin of the cross-track error dynamics is USGES. \qed
-\end{pf}
+\end{proof}
 
 
 \begin{proposition}
@@ -442,23 +442,23 @@ The two tasks $\bm{x}_A$ \eqref{eq:task_a} and $\bm{x}_{B1}$ \eqref{eq:link_LOS}
 \end{equation}
 and the task Jacobian $\bm{J}_{B2}$ has full row rank.
 \end{proposition}
-\begin{pf}
+\begin{proof}
     This can be verified by inspection. As mentioned in Theorem \ref{thm:main_task}, $\bm{J}_A$ has full row rank due its first three columns containing an adjoint mapping. The triangular block $\bm{L}$ in $\bm{J}_{B1}$ \eqref{eq:LOS_Jacobian_tril} also has full rank at all times, and is independent of the first two and last column of $\bm{J}_A$. \qed
-\end{pf}
+\end{proof}
 
 \begin{proposition}
     \label{prop:independent_B2}
 The two tasks $\bm{x}_A$ \eqref{eq:task_a} and $\bm{x}_{B2}$ \eqref{eq:link_cross} are independent in an open neighborhood around $\bm{\theta} = \bm{0}$, and for all $\bm{p}^n_b$ and $\bm{\psi}^n_b \neq \pi_p \pm \frac{\pi}{2}$. Further, the task Jacobian $\bm{J}_{B2}$ for task $\bm{x}_{B2}$ has full row rank in the same subset of the state space.
 \end{proposition}
-\begin{pf}
+\begin{proof}
     This holds by inspection of the respective task Jacobians. As the pose of the head link (task $\bm{x}_A$) can be controlled by controlling the base pose, the joints can be used to control the remaining links towards the path without interfering with the head link. If however, the links are oriented directly orthogonally to the path, the task Jacobian is at a singularity, with joint motions only causing along-track motion of the links.
-\end{pf}
+\end{proof}
 
 \begin{lemma}
     \label{lem:task_B1}
     The equilibrium $\tilde{\bm{x}}_{B1} = \bm{0}$ of the task $\bm{x}_{B1}$ \eqref{eq:link_cross} is locally exponentially stable (ES) given that the head link has converged to the path ($y^p_n = 0, \psi_n = \pi_p$). Further, this also implies ES of the origin $\bm{y}^p = \bm{0}$ of the system links for the same conditions.
 \end{lemma}
-\begin{pf}
+\begin{proof}
     Consider the Lyapunov function candidate of the task dynamics of task $\bm{x}_{B1}$ from Eq. \eqref{eq:link_LOS_dyn}
     \begin{equation}
         \label{eq:V_B1}
@@ -480,13 +480,13 @@ The two tasks $\bm{x}_A$ \eqref{eq:task_a} and $\bm{x}_{B2}$ \eqref{eq:link_cros
 
     Furthermore, the origin $\bm{y}^p = \bm{0}$ of all the link cross-track dynamics corresponds with the origin $y^p_n = 0, \tilde{\bm{x}}_{B1} = \bm{0}$ of the head link cross-track error and link angle errors.
     \qed
-\end{pf}
+\end{proof}
 
 \begin{lemma}
     \label{lem:task_B2}
     The equilibrium $\bm{x}_{B2} = \bm{0}$ of the task $\bm{x}_{B2}$ \eqref{eq:link_cross} is locally exponentially stable given that task $\bm{x}_A$ has converged to its desired state.
 \end{lemma}
-\begin{pf}
+\begin{proof}
     Consider the Lyapunov function candidate for the cross-track task dynamics from Eq. \eqref{eq:cross_track_task_dyn}
     \begin{equation}
         \label{eq:V_B2}
@@ -511,12 +511,12 @@ The two tasks $\bm{x}_A$ \eqref{eq:task_a} and $\bm{x}_{B2}$ \eqref{eq:link_cros
         \dot{V}(t) = -\bm{x}_{B2}^T \bar{\bm{\Lambda}}_{B2} \bm{x}_{B2} < 0 \quad \forall \bm{x}_{B2} \neq \bm{0},
     \end{equation}
     once the first task has converged. Using \cite[Theorem 4.10]{khalil2002}, we can conclude with exponential stability of the origin $\bm{x}_{B2} = \bm{0}$. \qed
-\end{pf}
+\end{proof}
 \begin{theorem}
     \label{thm:task_b1}
     The origin $\bm{y}^p = \bm{0}$ of the cross-track error dynamics for all links of the system \eqref{eq:dynamics} following a straight path segment with control law \eqref{eq:zeta_d}, with the link LOS method \eqref{eq:link_LOS} under Assumption \ref{ass:perfect_dyn} is locally exponentially stable (ES)
 \end{theorem}
-\begin{pf}
+\begin{proof}
     Analyzing the two main tasks as a cascaded system, we can apply \cite[Theorem 8.42]{chaillet2006}, which proves uniform local exponential stability for a cascade of subsystems with locally exponential equilibriums. To apply the theorem, we need to show that Assumptions 8.34 (Bound on interconnection term), 8.37 (Boundedness of solutions), 8.39 (UES of the driven subsystem), and 8.41 (UES of the driving subsystem) hold. We consider cross-track error dynamics of the first link \eqref{eq:head_cross_track_dynamics} as the driving subsystem, and the heading error dynamics of the remaining links \eqref{eq:link_LOS_dyn} as the driven subsystem. As mentioned, when the head link is on the path and the error in heading angle  of a link is zero, so is its cross-track error. We use $\bm{z} = \begin{bmatrix} y^p_n & \tilde{\psi}_1 & \tilde{\psi}_2 & \dots & \tilde{\psi}_{n-1} \end{bmatrix}^T$ to denote the total state of the cascade. We define $\bar{\bm{J}}_{B1} = (\bm{J}_{B1} \bm{J}_A^{\dagger})_{:3}$ as the last column of $\bm{J}_{B1} \bm{J}_A^{\dagger}$. Since only the last element of $\bm{x}_A$ affects task $\bm{x}_{B1}$ as discussed in Sec. \ref{sec:linkLOS}
 
     The interconnection term appears in Eq. \eqref{eq:link_LOS_dyn} as
@@ -536,20 +536,20 @@ The two tasks $\bm{x}_A$ \eqref{eq:task_a} and $\bm{x}_{B2}$ \eqref{eq:link_cros
     which is satisfied with $G(z) = \bar{\bm{J}}_{B1} \frac{\Delta_n u_{\rm LOS}}{(\Delta_n^2 + (y^p_n)^2)^{\frac{3}{2}}}$.
 
     Secondly, we must show boundedness of solutions. Since the driving subsystem is USGES (and thus also UGAS) by Theorem \ref{thm:main_task}, it is also globally bounded. Further, using the Lyapunov function Eq. \eqref{eq:V_B2}, we can apply \cite[Theorem 4.18]{khalil2002} and conclude with ultimate boundedness of $\bm{x}_{B2}$ as long as the interconnection term \eqref{eq:interconnection} is bounded, which we have already shown. Finally, Assumptions 8.39 and 8.41 require exponential stability of the origins of the subsystems, which are shown in  Theorem \ref{thm:main_task} and Lemma \ref{lem:task_B1}. We therefore conclude with uniform exponential stability of the origin $\bm{y}^p = \bm{0}$ of the link cross-track dynamics. \qed
-\end{pf}
+\end{proof}
 
 \begin{theorem}
     \label{thm:task_b2}
     The origin $\bm{y}^p = \bm{0}$ of the cross-track error dynamics for all links of the system \eqref{eq:dynamics} following a straight path segment with control law \eqref{eq:zeta_d}, with the link cross-track method \eqref{eq:link_cross} under Assumption \ref{ass:perfect_dyn} is locally exponentially stable (ES)
 \end{theorem}
-\begin{pf}
+\begin{proof}
     The proof follows the same procedure as for Theorem \ref{thm:task_b1}, but using the cross-track error dynamics of the remaining links \eqref{eq:cross_track_task_dyn} as the driven subsystem. For this case, the interconnection term is given by
     \begin{equation}
         \label{eq:interconnection}
         g(\bm{y}^p) = y_n^p\frac{u_{LOS}}{\sqrt{\Delta_n^2 + (y_e^p)^2}} \bm{I}_{n-1}.
     \end{equation}
     This satisfies Assumption 8.34 with $G(\bm{y}^p) = \frac{u_{LOS}}{\sqrt{\Delta_n^2 + (y_n^p)^2}}$. Using the Lyapunov function Eq. \eqref{eq:V_B2}, we can apply \cite[Theorem 4.18]{khalil2002} and conclude with ultimate boundedness of $\bm{x}_{B2}$. Finally, exponential stability of the origin of task $x_{B2}$ is shown in Lemma \ref{lem:task_B2}. We therefore conclude with uniform exponential stability of the origin $\bm{y}^p = \bm{0}$ of the vehicle's link cross-track dynamics. \qed
-\end{pf}
+\end{proof}
 
 \begin{remark}
     We are unable to show global (or semi-global) stability properties due to the possible existence of singularities in the task Jacobian $\bm{J}_{B2}$.
@@ -562,26 +562,26 @@ In this section, the proposed method is implemented in a numerical simulation of
 
 % \begin{figure}
 %     \centering
-%     \includegraphics[width=\linewidth]{figures/Eely.png}
+%     \includegraphics[width=\linewidth]{figures/pathfollowing/Eely.png}
 %     \caption{The Eelume 150 AIAUV}
 %     \label{fig:eely}
 % \end{figure}
 
 \begin{figure}
     \centering
-    \includegraphics[width=0.95\linewidth]{figures/cross_track.png}
+    \includegraphics[width=0.95\linewidth]{figures/pathfollowing/cross_track.png}
     \caption{Positions of the end-effector and base using the link cross-track controller}
     \label{fig:crosstrack}
 \end{figure}
 \begin{figure}
     \centering
-    \includegraphics[width=0.95\linewidth]{figures/link_los.png}
+    \includegraphics[width=0.95\linewidth]{figures/pathfollowing/link_los.png}
     \caption{Positions of the end-effector and base using the link-LOS controller}
     \label{fig:link_los}
 \end{figure}
 \begin{figure}
     \centering
-    \includegraphics[width=0.95\linewidth]{figures/pinnerobot.png}
+    \includegraphics[width=0.95\linewidth]{figures/pathfollowing/pinnerobot.png}
     \caption{Positions of the end-effector and base when only controlling the end-effector}
     \label{fig:pinnerobot}
 \end{figure}
@@ -595,7 +595,7 @@ For a more quantitative comparison, Figure~\ref{fig:error} shows the total track
 \begin{figure}
     \label{fig:error}
     \centering
-    \includegraphics[width=\linewidth]{figures/tracking_error.png}
+    \includegraphics[width=\linewidth]{figures/pathfollowing/tracking_error.png}
     \caption{Comparison of the total tracking error}
 \end{figure}
 \section{CONCLUSIONS AND FUTURE WORK}
