@@ -1,0 +1,618 @@
+\documentclass[../main.tex]{subfiles}
+\begin{document}
+
+\chapter{Experimental comparison of kinematic task-priority controllers}
+
+%\begin{abstract}
+%The class of articulated intervention-AUVs (AIAUVs) consists of free-floating, slender, multi-link vehicles with distributed thrusters and no distinct base, allowing the entire vehicle to be modeled and controlled as a manipulator. This property offers a practical degree of freedom in choosing the body-frame location, a choice shown here to directly affect closed-loop performance. We revisit two classical closed-loop inverse kinematics (CLIK) formulations for hierarchical control and investigate their differences in the context of AIAUVs. We introduce the concept of body-velocity sharing, a phenomenon where different tasks depend on overlapping body-frame motions, and formalize it through the notion of body-sensitivity subspaces. We show that AIAUVs predominantly operate in {\color{ForestGreen}regimes of partial task compatibility}, where the two CLIK formulations differ. To validate this, we conduct open-water field trials with the Eelume-M, a 6-meter-long AIAUV, comparing the two control laws, i.e. the projected-residual and post-projection laws. The experiments confirm the theoretical predictions: the projected-residual law improves secondary task tracking but is more sensitive to algorithmic singularities, whereas the post-projection law is more robust but yields reduced secondary performance. These results provide practical guidelines for selecting kinematic task-priority control laws in AIAUVs \textcolor{blue}{but is applicable to any floating-base or mobile-base system, particularly those without a distinct physical base module} %in robotic systems without a distinct base.
+%\end{abstract}
+
+
+This work revisits two classical \gls{clik} formulations for hierarchical control and investigates their differences in the context of \glspl{aiauv}. The class of \glspl{aiauv} consists of free-floating, slender, multi-link vehicles with distributed thrusters and no distinct base, allowing the entire vehicle to be modeled and controlled as a manipulator. The concept of body-velocity sharing, a phenomenon where different tasks depend on overlapping body-frame motions, is introduced and formalized through the notion of body-sensitivity subspaces. Changing the location of the system's body-frame is shown to directly affect both controllers' closed-loop performance, and it shown that due to body-velocity sharing, tasks for \glspl{aiauv} most often fall into an intermediate regime between orthogonal and strictly incompatible tasks, causing the two task-priority formulations to differ. The theory is validated through open-water field trials with the Eelume-M, a 6-meter-long AIAUV, comparing the two control laws. The experiments confirm the theoretical predictions: the projected-residual law improves secondary-task tracking but is more sensitive to algorithmic singularities, whereas the post-projection law remains robust to such singularities at the cost of reduced secondary-task performance. These results provide practical guidelines for selecting kinematic task-priority control laws and body-frame placement for \glspl{aiauv}.
+% in robotic systems without a distinct base, particularly AIAUVs %\textcolor{blue}{but is applicable to any floating-base or mobile-base system, particularly those without a distinct physical base module} %in robotic systems without a distinct base.
+
+%\acresetall % Skriv ut akronymer på nytt etter abstract
+\section{Introduction}
+
+%\glspl{vms} are a class of robotic systems consisting of a manipulator arm mounted on a movable base. A subclass of this is \glspl{uvms}, a typical example of which are \glspl{rov}. A novel example of an \gls{uvms} is the Eelume robot, an \gls{aiauv} developed at NTNU \cite{liljeback2017} before being spun off as its own company. The Eelume is a modular, slender articulated system, where the whole robot can be thought of as a manipulator with no separate base. It was procured by NTNU to act as an experimental platform for the verification of advanced control methods.
+
+%\gls{vms} are a prime example of redundant robotic systems, that is, robotic systems possessing more \glspl{dof} than required to perform a given task. Typically, the task considered is the position and orientation of the robots end-effector, requiring six \glspl{dof}. The challenge of resolving and utilizing this redundancy has been extensively studied in the context of fixed-base robot manipulators, and perhaps the most utilized solution is known as task-priority control.
+
+%Over recent decades, subsea operations have steadily shifted from divers to teleoperated work-class \glspl{rov}, with early, relatively rudimentary systems taking over hazardous inspection and tooling tasks. Today, the field is moving toward far more capable platforms, \glspl{uvms} and \glspl{aiauv}, that, in principle, can address most inspection, maintenance, and repair (IMR) needs. However, this rise in capabilities demands increasingly sophisticated and specialized control methods. Many foundational methods from terrestrial robotics, such as task-priority inverse kinematics, were transferred to the underwater domain in the 1990s and have matured since then \cite{antonelli1998, simetti2018a}. Yet as new vehicle classes with distinct characteristics emerge, it remains necessary to reevaluate these methods under new conditions. This paper contributes to this effort by analyzing two classical task-priority control laws in the context of \glspl{aiauv}, highlighting their theoretical differences and validating them through experimental trials.
+% \fixme{early},
+Over recent decades, subsea operations have steadily shifted from divers to teleoperated work-class \glspl{rov}, with relatively rudimentary systems initially taking over hazardous inspection and tooling tasks. Today, the field is moving toward far more capable platforms, \glspl{uvms} and \glspl{aiauv}, that, in principle, can address most inspection, maintenance, and repair (IMR) needs. However, this rise in capabilities demands increasingly sophisticated and specialized control methods. Many foundational methods from terrestrial robotics, such as task-priority inverse kinematics, were transferred to the underwater domain in the 1990s and have matured since then \cite{antonelli1998, simetti2018a}. Yet as new vehicle classes with distinct characteristics emerge, it remains necessary to reevaluate these methods under new conditions.
+
+%Task-priority control addresses scenarios where multiple control objectives must be achieved simultaneously, each with an assigned priority reflecting its relative importance. It is a widely used method across robotic systems, including fixed-base manipulators~\cite{nakamura1987}, humanoids~\cite{mistry2008}, aerial manipulators \cite{kondak2014}, and free-floating robots such as \glspl{uvms}~\cite{antonelli1998}. These control objectives, or \emph{tasks}, are expressed in suitable task coordinates, such as end-effector pose for manipulation. The idea of controlling robots in task coordinates dates back to~\cite{whitney1969}.  with the extension to multiple prioritized tasks introduced in~\cite{nakamura1987}. Among the most influential contributions are two kinematic-level task-priority formulations that we refer to as the \emph{projected-residual}~\cite{nakamura1987} and the \emph{post-projection}~\cite{chiaverini1997} laws. For some tasks, these methods differ significantly in how they resolve requested task-coordinate motions. We focus on these two classical formulations and analyze their behavior in the context of free-floating robots such as \glspl{aiauv}.
+
+%Task-priority control addresses scenarios where multiple control objectives must be achieved simultaneously, each with an assigned priority reflecting its relative importance. It is a widely used method across robotic systems, including fixed-base manipulators~\cite{nakamura1987}, humanoids~\cite{mistry2008}, and free-floating robots such as \glspl{uvms}~\cite{antonelli1998}. These objectives, or \emph{tasks}, are expressed in suitable task coordinates (e.g., end-effector pose). The idea of controlling robots in task coordinates dates back to~\cite{whitney1969}, with the extension to multiple prioritized tasks introduced in~\cite{nakamura1987}. Among the most influential kinematic formulations are the \emph{projected-residual}~\cite{nakamura1987} and \emph{post-projection}~\cite{chiaverini1997} laws, which differ in how secondary tasks are resolved within the redundancy left by higher-priority tasks. %These two methods are compared in \cite{baerlocher1998}.
+
+%\fixme{Related comparative studies exist; for example, \cite{baerlocher1998} contrasted similar formulations on a simulated humanoid. Our study complements this line of work by focusing on free-floating \glspl{aiauv}, where the base twist enters most task Jacobians and the body-frame location is a meaningful design variable. We formalize \emph{body-velocity sharing} and its link to task-compatibility modes, and we validate the theoretical insights with open-water experiments on a real platform. In this way, the present comparison of \eqref{eq:nakamura extended} and \eqref{eq:chiaverini extended} addresses phenomena that do not arise (or are not emphasized) in fixed-base or humanoid simulations, while remaining consistent with prior findings.}
+
+Task-priority control addresses scenarios where multiple control objectives must be achieved simultaneously, each with an assigned priority reflecting its relative importance. It is a widely used method across robotic systems, including fixed-base manipulators~\cite{nakamura1987}, humanoids~\cite{mistry2008}, and free-floating robots such as \glspl{uvms}~\cite{antonelli1998}. These objectives, or \emph{tasks}, are expressed in suitable task coordinates (e.g., end-effector pose). The idea of controlling robots in task coordinates dates back to~\cite{whitney1969}, with the extension to multiple prioritized tasks introduced in~\cite{nakamura1987}. Among the most influential kinematic formulations are the \emph{projected-residual}~\cite{nakamura1987} and \emph{post-projection}~\cite{chiaverini1997} laws, which differ in how secondary tasks are resolved within the redundancy left by higher-priority tasks. Comparative studies in other domains exist, for example, \cite{baerlocher1998} in humanoid robots. This paper complements that line of work by focusing on free-floating robots, particularly \glspl{aiauv}, comparing the projected-residual and post-projection laws experimentally, and highlighting phenomena that are less pronounced in fixed-base or humanoid settings while remaining consistent with prior findings. 
+
+% \fixme{These methods have previously been compared with application to humanoids \cite{baerlocher1998}. This paper complements this work by focusing on free-floating robots (particularly \glspl{aiauv}), comparing the methods experimentally,and highlighting phenomena that aren't pronounced in other robots, while remaining consistent with prior findings.} 
+% \fixme{Comparative studies of these methods have been carried out in other domains; \cite{baerlocher1998} compared them in the context of humanoid robots. Our study complements this line of work by focusing on free-floating \glspl{aiauv}, comparing the methods in experiments, and highlighting phenomena not emphasized in fixed-base or humanoid simulations, while remaining consistent with prior findings.}
+
+%where the base twist enters most task Jacobians and the body-frame location is a meaningful design variable. We formalize \emph{body-velocity sharing} and its link to task-compatibility modes, and validate the theoretical insights with open-water experiments on a real platform. In this way, the present comparison of \eqref{eq:nakamura extended} and \eqref{eq:chiaverini extended} highlights phenomena not emphasized in fixed-base or humanoid simulations, while remaining consistent with prior findings.
+
+%aerial manipulators~\cite{kondak2014} - Referansen tar veldig mye plass
+% Among the most influential kinematic formulations are the \emph{multiple task-priority}~\cite{nakamura1987} and \emph{singularity-robust multiple task-priority (SRMTP)}}~\cite{chiaverini1997} laws, which will we denote the projected-residual, and post-projection laws respectively, differing in how secondary tasks are resolved within the redundancy left by higher-priority tasks.
+
+
+Only a limited number of works have reported experimental studies of task-priority control in underwater robots. Notable examples include the Ocean One humanoid-robotic diver \cite{brantner2021}, the MARIS project \cite{simetti2018}, and the TWINBOT project \cite{Pi2021}. Earlier experiments specifically on \glspl{aiauv} are limited only to \cite{borlaug2022}. While these studies demonstrate significant progress in applying task-priority control to underwater robotics, they do not consider alternative task-priority formulations, focusing instead on a single approach; consequently, there is no direct comparison of formulations. In particular, no such analysis exists for \glspl{aiauv}, where body-frame placement and body-velocity sharing play a decisive role; \cite{borlaug2022}, for instance, focuses mainly on low-level control with only a basic treatment of task-priority aspects. This paper addresses this gap by presenting the first experimental comparison of two classical task-priority formulations on an \gls{aiauv}, supported by a theoretical analysis of task compatibility and body-velocity sharing.
+
+ % and . The former focusing mainly on the dynamic-level controller. Neither discuss placement of the body frame, nor consider other approaches than the post-projection approach.
+
+%Major experimental studies using task-priority control for \glspl{uvms} include the Ocean One robot \cite{brantner2021}, the MARIS project \cite{simetti2018}, and the TWINBOT \cite{Pi2021}. The Ocean One is a 20-\gls{dof} humanoid diving robot which was controlled with a task-priority controller, and The MARIS project used the iCAT framework \cite{simetti2016}, which allows including set-based inequality tasks into a kinematic-level task-priority controller. The complete system combined a whole-body controller with a vision framework to achieve an autonomous grasping task in a pool environment. Related projects and results are detailed in \cite{simetti2018a}.
+
+%In \cite{palmer2024}, a set-based kinematic-level task-priority framework was used for experiments to achieve end-effector station keeping.
+
+\glspl{aiauv} are a subclass of \glspl{uvms} in which the vehicle itself is an articulated, slender, multi-link structure with thrusters distributed along the body, rather than a heavy hull carrying a separate manipulator. A representative platform is the Eelume-M robot \cite{liljeback2017}, which is a modular, snake-like design that enables efficient transit, as well as fully actuated hovering and precise interaction, effectively treating the entire vehicle as a manipulator without a separate base. For several years, its mathematical model has served as a reference platform for simulation studies of advanced control methods \cite{iversflaten2022,tveter2024,iversflaten2023,saebo2022,wrzos-kaminska2024}. Recently, the vehicle has been made available for broader research use, making the Eelume-M well suited for experimental evaluation of whole-body controllers and task-priority schemes.
+
+%an \gls{aiauv} developed at NTNU and later commercialized. Eelume-M's 
+
+In this paper, the problem of kinematic-level task-priority control for \glspl{aiauv} is considered. Due to their unique structure, with multiple links of comparable inertia and thrusters distributed along the body, they differ significantly from traditional \glspl{uvms}, and thus pose new control challenges. We discuss the placement of the body frame, which is a nontrivial design choice for \glspl{aiauv}, and its implications for controller design and performance. This choice determines how task motions are split between the system's body and joint velocities. Practical \gls{aiauv} task pairs are often sensitive to the same body-frame motions, leading to what we call body-velocity sharing. This sensitivity makes the choice of kinematic control law consequential, which motivates our focus on two classical formulations: \cite{nakamura1987} and \cite{chiaverini1997}, which we denote the projected-residual and the post-projection methods, respectively. Moreover, we introduce a task-compatibility taxonomy which guides the choice of control law. When tasks fall outside the two extremes (orthogonal or strictly incompatible), a situation common in \glspl{aiauv} because the free-floating base appears in most task Jacobians, the two laws can differ significantly. We analyze how body-velocity sharing induces these intermediate regimes and identify when each control law is preferable. Finally, we present results from open-water field trials with the snake-like Eelume-M \gls{aiauv} (cf. Fig. \ref{fig:eely_render}) to compare the two control laws experimentally.
+
+The remainder of the paper is organized as follows. Section \ref{sec:sys_overview} describes the mathematical model of the \gls{aiauv} and discusses body-frame placement. Section \ref{sec:task_priority} introduces the notion of body-velocity sharing and compares the two kinematic-level task-priority control laws from \cite{nakamura1987} and \cite{chiaverini1997}. Section \ref{sec:experiments} presents the experimental setup and results and Section \ref{sec:conclusions} concludes the paper.
+
+
+\section{Mathematical model}
+\begin{figure}[htpb]
+    \centering
+    \includegraphics[width=\linewidth]{figures/ICRA/eelume_render.png}
+    \caption{Render of the Eelume 500 AIAUV (Eelume-M). Its ``head'' is to the left and its ``tail'' is to the right.}
+    \label{fig:eely_render}
+\end{figure}
+
+In this section, we present the kinematic model of \glspl{uvms} and then specialize the formulations to the subclass of \glspl{aiauv}. Furthermore, we discuss the implications of the placement of the body frame, which is a nontrivial design choice for \glspl{aiauv}.
+\label{sec:sys_overview}
+
+\label{sec: mathematical model markus}
+Consider a \gls{uvms} with $n$ revolute joints. Its configuration can be described by the triple \( \xi \coloneqq \left( p, q, \theta \right)\). It consists of a body frame position \( p \coloneqq p^n_b \in \mathbb{R}^3 \) and orientation \( q \coloneqq q^n_b \in \mathbb{S}^3 \), as well as a vector of joint angles \( \theta \in \mathbb{R}^n \). %Vil vi ha joint angles i T^n hvis q i S^3 osv? Være konsistent på geometrinotasjon-ish.
+% Nei. I tillegg er ikke (p,q) et SE(3)-element 
+We denote the body frame by \( \{b\} \) and relate it to a local \gls{ned} frame \( \{n\} \), assumed to be inertial. We express the orientation via the unit quaternion, which we split into its scalar and vector parts as \( ( \rho, \epsilon ) \coloneqq  q\). The body-fixed velocities of a \gls{uvms} are denoted \( \zeta \coloneqq ( \nu, \dot{\theta} ) \coloneqq (v^b_{nb}, \omega^b_{nb}, \dot{\theta}) \in \mathbb{R}^3 \times \mathbb{R}^3 \times \mathbb{R}^n\), representing the linear, angular, and joint velocities, respectively. We can then express the system's governing kinematics as
+\begin{equation}
+\label{eq:kinematics markus}
+    \dot{\xi} = J (q) \zeta,
+\end{equation}
+where \( J \coloneqq J^n_b : \mathbb{S}^3 \to \mathbb{R}^{(7+n)\times (6+n)} \) is the Jacobian matrix
+\begin{flalign}
+&\hspace{0mm} % To make room for eq. number
+    J(q) \!=\!
+    \begin{bmatrix}
+        R(q) & 0_{3\times 3} & 0_{3\times n} \\
+        0_{4\times 3} & T(q) & 0_{4\times n} \\
+        0_{n\times 3} & 0_{n\times 3} & I_n
+    \end{bmatrix}, 
+    T(q) \!=\! \dfrac{1}{2}
+    \begin{bmatrix}
+        -\epsilon^{\top} \\
+        \rho I_3 + S(\epsilon),
+    \end{bmatrix}.&
+    \raisetag{1.6\baselineskip}
+\end{flalign}
+The matrix \( R(q) \in \mathrm{SO}(3) \) describes the rotation from \( \{b\} \) to \( \{n\} \), \( S: \mathbb{R}^3 \to \mathfrak{so}(3) \) is the skew-symmetry map, and \( I_n \) is the $n \times n$ identity matrix.
+
+% We formulate the dynamics of a \gls{uvms} in its body frame as \cite{schmidt-didlaukies2018, from2014}
+% \begin{equation}
+% \label{eq:dynamics markus}
+%     M(\theta)\dot{\zeta} + C(\theta,\zeta)\zeta + D(\theta,\zeta)\zeta + g(\xi) = \tau.
+% \end{equation}
+
+% The matrix \( M(\theta) \in \mathbb{R}^{(6+n)\times(6+n)}\) contains the \gls{uvms}'s total inertia, including rigid-body and added-mass effects.
+% Moreover, \( C(\theta,\zeta), D(\theta,\zeta) \in \mathbb{R}^{(6+n)\times(6+n)} \) are the Coriolis and damping matrices, \( g(\xi) \in \mathbb{R}^{6+n} \) is the hydrostatics vector, and \( \tau \in \mathbb{R}^{6+n} \) is the vector of control forces and torques, generated by the vehicle's actuators. Note that from now on we will omit writing the matrix dependencies unless required for context.
+
+\glspl{uvms} are in general actuated by \(m\) thrusters and \(n\) joint motors. The commanded inputs \(u=(u_\eta, u_\theta)\) consist of thruster forces \(u_\eta \in \mathbb{R}^m\) and joint torques \(u_\theta \in \mathbb{R}^n\). These inputs generate generalized forces and moments \(\tau \in \mathbb{R}^{6+n}\) through the map \(\tau = B(\theta)u\), where
+\begin{equation}
+B(\theta)=\begin{bmatrix}
+B_{\eta}(\theta) & 0_{6\times n}\\[2pt]
+B_{\theta}(\theta) & I_{n}
+\end{bmatrix}
+\in \mathbb{R}^{(6+n)\times(m+n)}.
+\label{eq:alloc}
+\end{equation}
+% These forces and torques are related to the actuator commands \( u \in \mathbb{R}^{m+n} \) via
+% \begin{equation}
+%     \tau \coloneqq B(\theta)u, \quad
+% B(\theta)
+% =
+% \begin{bmatrix}
+% B_{\eta}(\theta) & 0_{6\times n}\\[2pt]
+% B_{\theta}(\theta) & I_{n}
+% \end{bmatrix},
+% \label{eq:alloc}
+% \end{equation}
+% where \( B(\theta) \in \mathbb{R}^{(6+n)\times (m+n)} \) is the configuration-dependent actuator allocation matrix.\todo[inline]{Bthr or Beta?}
+The blocks on the diagonal of \( B \) comprise the most common actuator mapping for traditional \glspl{uvms}. \( B_\eta \) describes how the thrusters affect the body-frame link, while \( I_n \) directly maps each commanded joint torque to its associated joint. The block \( B_\theta \) maps thruster forces to joint torques. This term only appears when there exist thrusters attached to links other than the base. %\( \{b\} \).
+In most traditional \glspl{uvms}, \( B_\theta = 0 \), whereas in \glspl{aiauv} it can be nonzero and configuration-dependent. For control, desired generalized forces and moments can be converted to thruster commands and joint torques via
+\begin{equation}
+    u = B(\theta)^\dagger \tau,
+\end{equation}
+where \( \dagger \) denotes the Moore-Penrose pseudoinverse.
+%The block \( B_\theta \) maps thruster forces to joint torques. This term only appears when there exist thrusters on links other than on \( \{b\} \).
+
+The choice of body frame origin is an inherent part of the kinematic formulations in \eqref{eq:kinematics markus}, as all quantities are expressed relative to this frame. 
+% \textcolor{blue}{Eg føle absolutt at det enklaste e å ha med den dynamiske modellen, for da slippe ein å ver så forsiktig med ka som e definert osv. Men det tar selvfølgelig mer plass... Usikker på kor mye me har å gå på te slutt.}
+While the placement of $\{b\}$ does not alter the physical motion of the system directly, it influences how the control effort is partitioned between the vehicle's base and its manipulator. Thus, the placement of $\{b\}$ is not merely a modeling convention but a design decision with direct implications for controller behavior and closed-loop performance.
+% På ROV med tung base vil valg av {b} fortsatt påvirke kinematikken i noe grad, mye mindre enn på Eely, men stor forskjell på å feks be om rotasjon rundt massesenter eller monteringspunkt for arm. Kan kanskje nevnes som en liten aside, men er kanskje mer relevant å snakke om hvis man jobber på dynamisk nivå og kan bruke vektet pinv for å unngå problemet
+
+
+
+\section{Kinematic-level task-priority control}
+\label{sec:task_priority}
+In this section, we introduce two classical task-priority methods and compare their theoretical properties. To this end, we develop a task-compatibility taxonomy and relate it to the notion of body-velocity sharing, which is especially pronounced in free-floating robots.
+
+% \fixme{A major motivation for utilizing kinematic-level control is that in contrast to dynamic level approaches such as \cite{khatib1987} they don't rely on potentially erroneous dynamical models \cite{dilillo2021}}.
+% \textcolor{blue}{E dette ein kommentar på robusthet fra reviewers? Eg klare ikke å finna ein bra plass å inkludera ein kommentar om dynamic-level TP, men hvis me ska ha det med så tror eg at eg ville hatt det i introduksjonen. For eksempel i "in this paper"-avsnittet.}
+
+In this context, all kinematic control objectives are referred to as \emph{tasks}. Each task \( x_i \in \mathbb
+{R}^{m_i} \) is defined as the image of the configuration \( \xi \) under a mapping \( f_i: \mathbb{R}^{7+n} \to \mathbb{R}^{m_i} \):
+\begin{equation}
+\label{eq:task definition}
+    x_i \coloneqq f_i(\xi),
+\end{equation}
+where \( i \in \mathcal{K} \coloneqq \{1, \dots, k\} \) indexes a task. The kinematic goal is to find a desired configuration trajectory \(\xi_d(t) \) such that \(f_i(\xi_d(t)) = x_{i,d}(t), \ \forall i \in \mathcal{K}, \ \forall t \geq 0\).
+\begin{assumption}
+    The desired task trajectories are defined for all \( t\geq0 \), i.e. \( x_{i,d}, \dot{x}_{i,d} : [0,\infty) \to \mathbb{R}^{m_i} \), for each \( i \in \mathcal{K} \). 
+\end{assumption}
+%\fixme{The desired configuration trajectory \( \xi_d(t) \) is obtained from the time derivative} of \eqref{eq:task definition}: Motivasjon: xi_d kommer fra integralet av zeta_d, ikke deriverte av x
+% Kristin som endret til xi_d
+% Har skrevet dette med position vs velocity level før, men føler ikke at det er viktig å ta med. Flere andre papers hopper rett over x_i=f_i og begynner rett på velocity-level for å spare plass. 
+% \fixme{The desired configuration trajectory \( \xi_d(t) \) is obtained by solving the kinematics at the velocity-level, to this end we differentiate \eqref{eq:task definition}} and define the task Jacobian \(J_i\):
+We find \( \xi_d(t) \) by first resorting to the time derivative of \eqref{eq:task definition}, as
+\begin{equation}
+\label{eq:task differential relationship}
+    \dot{x}_i = \dfrac{\partial f_i(\xi)}{\partial \xi}\dot{\xi} = \dfrac{\partial f_i(\xi)}{\partial \xi} J (\xi) \zeta \coloneqq J_i (\xi) \zeta,
+\end{equation}
+where we use \eqref{eq:kinematics markus}. If the task Jacobian \( J_i \) is non-singular, we can solve \eqref{eq:task differential relationship} for \( \zeta \).
+% { \color{green} A robot is kinematically redundant with respect to a task when it has more \glspl{dof} than are required to accomplish it, i.e., for a task \( x_1 \in \mathbb{R}^{m_1} \), we have \( 6+n > m_1 \), allowing completion of several simultaneous tasks}.
+Tasks are ordered by priority (with higher priority corresponding to lower index \( i \in \mathcal{K} \)). The control methods utilize null-space projections to enforce their priorities. %To ensure that secondary tasks have no effect on the higher-priority tasks,   they are constrained to the higher tasks' null space.
+% De er constrained til null spacet av den stacka Jacobianen av alle tasks med høyere prioritet
+
+%, removing any conflicting components.
+%When some tasks cannot be satisfied simultaneously, a hierarchical (task-priority) resolution is used: tasks are ordered by priority (with higher priority corresponding to lower index \( i \in \mathcal{K} \)). Lower-priority tasks are confined to the null space of all higher-priority Jacobians so they cannot disturb already satisfied objectives.
+% ^ Vil få fram at projecksjon fjerner påvirkning oppover i hierarkiet også for kompatible oppgaver. Og at dette ikke bare gjelder ting som har konvergert ( already satisfied)
+
+Consider a hierarchy of two tasks, \(x_1\) and \(x_2\). We highlight two methods for calculating the contribution of the secondary task, which are the subject of \cite{chiaverini1997,baerlocher1998}.
+The first method, which we refer to as the projected-residual law, originates from early task-priority control work and yields the solution \cite{nakamura1987}, \cite[eq. (8)]{chiaverini1997}
+\begin{equation}
+\label{eq:chiaverini 8}
+    \zeta_d = J_1^{\dagger} \dot{x}_{1,d} + (J_2 N_1)^\dagger (\dot{x}_{2,d} - J_2 J_1^\dagger \dot{x}_{1,d}),
+\end{equation}
+where \( N_1(\xi) \coloneqq I_{6+n} - J_1^\dagger J_1 \) is the projector onto the null space of \( J_1 \). The second method, which we call the post-projection law, can be written as \cite[eq. (34)]{chiaverini1997}
+\begin{equation}
+\label{eq:chiaverini 34}
+    \zeta_d = J_1^{\dagger} \dot{x}_{1,d} + N_1J_2^{\dagger} \dot{x}_{2,d}.
+\end{equation}
+
+Since \eqref{eq:chiaverini 8} and \eqref{eq:chiaverini 34} are prone to drifting when integrated to obtain \( \xi_d \), task feedback is added to the control laws as in~\cite{sciavicco1988}.
+Furthermore, to generalize each control law to accommodate an arbitrary number of tasks, we use \cite{siciliano1991} and \cite{antonelli2009}. We choose to represent the extensions for both control laws in a recursive form, as it highlights their differences. The extended forms are then given by
+
+\begin{subequations}\label{eq:nakamura extended}
+\begin{empheq}[left={\parbox{25mm}{\raggedright\emph{Projected--\\residual law}}\,\empheqlbrace}]{flalign}
+& \zeta_1 = J_1^{\dagger} \dot{x}_{1,r} && \\
+& \zeta_i = \zeta_{i-1} + (J_i \bar N_{i-1})^{\dagger}\!\left(\dot x_{i,r} \!-\! J_i \zeta_{i-1}\right), &&
+\end{empheq}
+\end{subequations}
+
+\begin{subequations}\label{eq:chiaverini extended}
+\begin{empheq}[left={\parbox{25mm}{\raggedright\emph{Post--\\projection~law}}\,\empheqlbrace}]{flalign}
+& \zeta_1 = J_1^{\dagger} \dot{x}_{1,r} && \\
+& \zeta_i = \zeta_{i-1} +  \bar{N}_{i-1} J_i^{\dagger} \left( \dot{x}_{i, r} \right). &&
+\end{empheq}
+\end{subequations}
+
+
+Here, \( \dot{x}_{i,r} \coloneqq \dot{x}_{i,d} + \Lambda_i \tilde{x}_i \) with \( \Lambda_i \succ 0\ \) a positive-definite gain matrix for each  \( i \in \mathcal{K} \), \( \tilde{x}_i \) is the minimal-representation task error, 
+%\( \ominus \) denoting the minimal task-difference operator (e.g. \( q_d \ominus q \coloneqq \rho \epsilon_d - \rho_d \epsilon + S(\epsilon)\epsilon_d \)), 
+and \( \bar{N}_i \coloneqq I-\bar{J}_i^\dagger \bar{J}_i \) for \( \bar{J}_i \coloneqq [J_1^\top \ J_2^\top \cdots J_i^\top]^\top \). 
+The reference velocities \( \zeta_d \) produced by the kinematic controllers need to be tracked by a separate low-level controller, which we describe in \Cref{sec:experiment_setup}. These methods form the basis for the following discussion and for the experimental comparison in \cref{sec:experiments}. For clarity, we focus on the case of two tasks, though the arguments extend to more tasks.
+
+% Both methods satisfy the ordered-priority property; \( (J_2 N_1)^\dagger \) and \( N_1J_2^\dagger \) ensure that the contribution from task \( x_1 \) remains unaffected by task \(x_2\). \cite{chiaverini1997} further showed that the secondary contributions of \eqref{eq:nakamura extended} and \eqref{eq:chiaverini extended} are equivalent when the tasks are either strictly ``compatible'' or strictly ``incompatible.'' This dichotomy positions \eqref{eq:nakamura extended} as the superior control law, highlighting its singularity robustness while suggesting equivalence to \eqref{eq:chiaverini extended} in all other cases. While not incorrect, this view overlooks an intermediate case that frequently arises in \glspl{aiauv}: partial task compatibility. This regime is most often caused by a phenomenon we term body-velocity sharing, which we formalize in the following.
+
+% It was shown in \cite{chiaverini1997} that the two approaches are equivalent when the tasks are orthogonal (\( J_1 \cdot J_2^T = 0\) \textcolor{blue}{\(\implies N_1 J_2^{\dagger} = (J_2N_1)^{\dagger} =J_2^\dagger,\ J_2J_1^\dagger=0\)}), and when they are completely incompatible ($N_1 J_2^{\dagger} = (J_2N_1)^{\dagger} = 0$). Most of the time, however, tasks are neither orthogonal, nor strictly incompatible \textcolor{blue}{(for free-floating systems)}. Instead being either partially compatible (linearly dependent), or fully compatible (linearly independent), but not orthogonal. As we detail below, in these more common scenarios, the two methods differ significantly. An important reason, partially specific to \glspl{aiauv}, is a phenomenon we term body-velocity sharing, which we formalize in the following.
+% \todo[inline]{Føler at det går an å melde litt på Chiaverini her}
+
+It was shown in \cite{chiaverini1997} that the two laws are equivalent iff
+\[
+J_2J_1^\dagger=0 \quad\text{or}\quad
+J_2N_1 = 0
+\]
+which occurs in two cases: either the tasks are orthogonal or strictly incompatible. For free-floating systems, and particularly for \glspl{aiauv}, tasks rarely fall into either of these extremes. Instead, most practical task pairs belong to an intermediate regime in which the two laws may differ substantially. An important reason is a phenomenon we term \emph{body-velocity sharing}, where tasks depend on overlapping body-twist directions. In the following, we will first introduce a taxonomy of four compatibility modes, two of which describe this intermediate regime, and relate them to the notion of body-velocity sharing. This taxonomy will then serve as the basis for analyzing the differences between \eqref{eq:nakamura extended} and \eqref{eq:chiaverini extended}.
+
+
+\begin{definition}[Strictly incompatible tasks]
+    Two tasks \(x_1\) and \(x_2\) are strictly incompatible if the row space of the second task's Jacobian is a subset of the first's, that is \( \row(J_2) \subseteq \row(J_1)\). In this case \( J_2 N_1 = 0\).
+\end{definition}
+\begin{definition}[Partially incompatible tasks]
+    Two tasks \(x_1\) and \(x_2\) are partially incompatible if the row spaces of their Jacobians are linearly dependent, that is \( \row(J_1) \cap \row(J_2) \neq \{0\} \). In this case \( \rank(J_2 N_1) < \rank(J_2) = m_2\).
+\end{definition}
+\begin{definition}[Compatible tasks]
+    Two tasks \(x_1\) and \(x_2\) are compatible if the row spaces of their Jacobians are linearly independent, that is \( \row(J_1) \cap \row(J_2) = \{0\} \). In this case \( \rank(J_2 N_1) = \rank(J_2) = m_2\).
+\end{definition}
+\begin{definition}[Orthogonal tasks]
+    Two tasks \(x_1\) and \(x_2\) are orthogonal if the row spaces of their Jacobians are orthogonal, that is \( \row(J_1) \perp \row(J_2) \). In this case \( J_2 N_1 = J_2\), and \( J_1 J_2^\top = J_2J_1^\top = 0\).
+\end{definition}
+
+%\begin{remark}
+%    If two tasks are strictly incompatible, they are also incompatible. Equivalently, if two tasks are orthogonal, they are also compatible.
+%\end{remark}
+\begin{remark}\label{rem:compat-config}
+Task compatibility can be configuration-dependent. When that is the case, the row spaces of \( J_1 \) and \( J_2 \) change with \( \xi \), so the overlap dimension can increase or decrease. This can cause \( \mathrm{rank}(J_2N_1) \) to drop or recover and the task pair \(x_1, x_2\) to move between compatibility modes. %This is pronounced in floating-base systems, such as \glspl{aiauv}, where body-velocity sharing is common.
+\end{remark}
+
+When the secondary task relies solely on motions that would affect the primary task, they are strictly incompatible; the secondary task is completely suppressed by the null-space projection. At the other extreme, if two tasks utilize disjoint sets of system velocities, which means that they cannot affect each other kinematically. In this case, the null-space projection leaves the secondary task entirely unchanged. These modes represent the trivial cases where both control approaches \eqref{eq:nakamura extended} and \eqref{eq:chiaverini extended} are equivalent.
+
+Between these two extremes lie two intermediate modes, which are both more common and interesting to analyze for \glspl{aiauv}. In these modes, the two controllers exhibit different behaviors. In particular, task pairs that belong to these modes can be either \emph{compatible} or \emph{partially incompatible}. When both tasks are simultaneously achievable despite depending on some of the same system velocities, they are compatible. On the other hand, when the secondary task can only be partially realized without hindering the primary, the tasks are partially incompatible. Moreover, in this mode the product \( J_2N_1 \) is rank deficient, which by definition constitutes an algorithmic singularity. 
+The prevalence of these intermediate modes is primarily due to a phenomenon we term body-velocity sharing, where tasks depend on overlapping body-frame velocities. We formalize this in the following.
+
+% Compatible tasks have linearly independent Jacobian row spaces, but as they are not orthogonal, the null-space projection modifies the scale and direction of the task secondary task Jacobian, though without reducing its rank.  By contrast, for partially incompatible tasks the row spaces of the task Jacobians overlap due to the tasks reliance on some of the same system velocities. In this case, projection onto the null space reduces the Jacobian's rank. Partially and strictly incompatible tasks fall under the notion of algorithmic singularities. 
+%This means that both tasks can be completed simultaneously, although the secondary task may be less efficiently achieved than if it were unconstrained.
+
+% \begin{remark}
+% The same two tasks can be both compatible and incompatible at different times, depending on the system configuration and desired trajectories. Consider two tasks, the position of the end-effector and base of an ROV. Moving the end-effector farther away from the than the arm can reach will obviously cause an incompatibility, yet the same two tasks are compatible (though not orthogonal) within the end-effector's reachable workspace.
+% \end{remark}
+
+
+
+%While the two approaches behave identically for completely orthogonal and completely incompatible tasks, they differ significanly in any other cases. The nearer the tasks are to orthogonal, the closer in performance the two approaches. However, the nearer they are an incompatible task, the larger the difference. A near-zero projected Jacobian simply means that the calculated joint velocity component is scaled to near-zero for the post-projection approach, but leads to arbitrarily large joint values in residual-projection.
+
+\begin{definition}[Body-velocity sharing]
+Partition each task Jacobian as % Zeta er allerede definert i sec 2?
+\begin{equation}
+    J_i(\xi) = \begin{bmatrix} J_i^{b}(\xi) & J_i^{\theta}(\xi)\end{bmatrix},
+    \quad J_i^{b}\in\mathbb{R}^{m_i\times 6},
+\end{equation}
+and the body-sensitivity subspace of task \(i\) as
+\begin{equation}
+    \mathcal S_i \coloneqq \mathrm{row}(J_i^{b}) \subseteq \mathbb{R}^6,
+\end{equation}
+i.e., the set of body-twist elements that affect task $i$.
+Two tasks $x_1,x_2$ \emph{share body velocities} if
+$\dim(\mathcal{S}_1\cap\mathcal{S}_2)>0$.
+A convenient way to compute this dimension is
+\begin{equation}
+\label{eq:shared-dim}
+    \mathrm{dim}(\mathcal{S}_1\cap\mathcal{S}_2)
+    =\mathrm{rank}(J_1^b)+\mathrm{rank}(J_2^b)-
+    \mathrm{rank}\left(\begin{bmatrix}J_1^b\\ J_2^b\end{bmatrix}\right).
+\end{equation}
+\end{definition}
+
+In floating-base systems, such as \glspl{aiauv}, any task expressed in inertial coordinates, such as maintaining or tracking a pose, necessarily depends on body velocities. As a result, tasks often rely on overlapping components of the body twist, meaning that their body-sensitivity subspaces \( \mathcal{S}_i \) are typically nontrivial and that \( \mathrm{dim}(\mathcal{S}_1\cap\mathcal{S}_2) \) can be large. This makes strictly orthogonal tasks rare; instead, one more often encounters compatible or partially incompatible tasks when the overlap dimension is large relative to \( m_2 \).
+
+% The difference between the control laws \eqref{eq:nakamura extended} and \eqref{eq:chiaverini extended} can be understood in terms of how they compute the secondary-task contributions. The projected-residual method, \eqref{eq:nakamura extended}, solves a constrained least-squares problem, explicitly taking into account the primary task's null space by inverting the product \( J_2N_1 \). This inversion makes the method sensitive to algorithmic singularities, i.e. cases where \( J_2N_1 \) loses rank even though both \( J_1 \) and \( J_2 \) are full rank. However,  Additionally, \eqref{eq:nakamura extended} compensates for the potential influence of task \( x_1 \) on task \( x_2 \) by subtracting the term \( J_2J_1^\dagger \dot{x}_{1,d} \). The drawback of this method is its sensitivity to algorithmic singularities, i.e., cases where the product \( J_2 N_1 \) loses rank even though both \( J_1 \) and \( J_2 \) are full rank. In contrast, \eqref{eq:chiaverini extended} first computes the unconstrained least-squares solution for the secondary task and then projects it into the null space of the primary task. This approach may result in reduced performance for the secondary task during the completion of the primary task. However, it is robust to algorithmic singularities because it avoids inverting the potentially singular product \( J_2 N_1 \).
+
+The difference between the control laws \eqref{eq:nakamura extended} and \eqref{eq:chiaverini extended} can be understood in terms of how they compute the secondary-task contributions. The projected-residual method, \eqref{eq:nakamura extended}, solves a constrained least-squares problem, explicitly taking into account the primary task's null space by inverting the product \( J_2N_1 \). This inversion makes the method sensitive to algorithmic singularities, i.e. cases where \( J_2N_1 \) loses rank even though both \( J_1 \) and \( J_2 \) are full rank. While potentially problematic, this inversion also enables compensation for the influence of the primary task on the secondary task through the term \( J_2J_1^\dagger \dot{x}_{1,d} \). This compensation is not possible in \eqref{eq:chiaverini extended}, which first computes the unconstrained least-squares solution for the secondary task and only then projects it into the null space of the primary task. That is, the optimization is blind to the directions that will later be removed by the projection. This approach may result in reduced performance for the secondary task during the completion of the primary task. However, it is robust to algorithmic singularities because it avoids inverting the potentially singular product \( J_2 N_1 \). 
+
+In the case of non-orthogonal, compatible tasks, this unconstrained solution of the secondary task contribution can often lead to a suboptimal solution, as the task Jacobian may be significantly modified by the null-space projection. If the unconstrained solution relies heavily on directions that lie outside the null space of the primary task, much of that effort is discarded by the projection. As the product \( J_2N_1 \) becomes singular, the post-projection approach remains well-defined. Any incompatible elements of the secondary task will be projected away after a numerically sound inversion of the unconstrained task Jacobian. On the other hand, the projected-residual approach will in these cases attempt to solve an ill-posed optimization problem and may request arbitrarily high system velocities to compensate for the loss of compatibility. At worst, this may lead to a collapse of the strict priority levels, causing a situation where the controller increases the errors in the primary task in an attempt to realize the secondary \cite{chiaverini1997, baerlocher1998}. 
+
+In the extreme case of strictly incompatible tasks, \(J_2N_1 = 0\) , the two methods are theoretically equivalent. Because task Jacobians generally vary with configuration (Remark~\ref{rem:compat-config}), strict incompatibility is rarely sustained in practice; even small perturbations or numerical effects tend to shift the system away from this regime, except in edge cases where constant Jacobians enforce permanent blocking.  
+
+%In theory the two methods behave exactly equally at points where tasks are strictly incompatible. However, in the neighborhood around such points, tasks are typically only partially incompatible, leaving an ill-posed least square problem and differing behavior.
+
+%\begin{remark}
+%The subspaces $\mathcal{S}_i$ quantify body-level coupling only.
+%Task compatibility for priority control is determined by the full Jacobians via
+%$r\coloneqq \mathrm{rank}(J_2 N_1)\in\{0,\dots,m_2\}$.
+%Here $r=m_2$ implies strict compatibility, $r=0$ strict incompatibility, and
+%$0<r<m_2$ indicates partial compatibility (i.e. an algorithmic singularity).
+%In free-floating AIAUVs, the subspaces $\mathcal{S}_i$ are typically nontrivial for many tasks, so
+%$\mathrm{dim}(\mathcal{S}_1\cap\mathcal{S}_2)$ is often large, making the partial regime $0<r<m_2$ common.
+%\end{remark}
+
+
+The problem of algorithmic singularities in \eqref{eq:nakamura extended} cannot be eliminated and must instead be managed. This is typically addressed by adding damping to the pseudoinverse calculation \( (J_2 N_1)^\dagger \). The damped pseudoinverse is defined as
+\begin{equation}
+    \label{eq:pinv_damped}
+     A^\# \coloneqq A^\top (AA^\top + \lambda^2 I)^{-1}
+\end{equation}
+for some damping factor \( \lambda > 0 \). This ensures that the matrix to be inverted is always of full rank. However, it comes at the cost of introducing a bias: directions associated with small singular values of \( A \) are attenuated, reducing the aggressiveness of secondary-task tracking. While algorithmic singularities only affect the projected-residual law, kinematic singularities, when a task Jacobian \( J_i \) loses rank, affect both formulations. Hence, the post-projection method's singularity robustness is limited to algorithmic singularities and does not remove the need for damping at kinematic singularities. 
+% \fixme{A damped pseudoinverse can also be applied in the case of \emph{kinematic singualirities}, where a task Jacobian \(J_i\) loses rank. This is relevant to both methods, as the post-projection approach's singularity-robustness only extends to algorithmic singularities.}
+
+%\begin{remark}
+%    While the post-projection approach is robust to algorithmic singularities, both methods remain vulnerable to kinematic singularities, where a task Jacobian loses rank. These are usually mitigated through avoidance strategies or damped pseudoinverses.
+%\end{remark}
+
+%  "must be tracked as accurately as possible, and one can afford to add damping to manage singularities." Demping gir mindre nøyaktig tracking, så muligens litt upresis formulering
+
+% Ultimately, the choice may come down to the application’s tolerance for secondary errors versus
+% its tolerance for any coupling in the primary task. Baerlocher and Boulic’s comparative study
+% strongly favored the projected-residual formulation (F1) for its better overall behavior (they even
+% used it for controlling a 49-DOF human figure with multiple tasks ). In contexts like free-floating
+% AUVs, many researchers also lean toward schemes that incorporate task error feedback (like F1)
+% for improved performance, while being mindful to add damping or other safeguards to handle the
+% inevitable singularities and coupling challenges. The post-projection method (F2) remains a useful
+% alternative when strict priority enforcement is paramount and one can accept reduced secondary
+% task performance as a necessary compromise
+
+\begin{remark} % hybrid
+    One might be tempted to consider a composite approach that seemingly combines the benefits of both methods, which is to add the compensation term from \eqref{eq:chiaverini 8} into \eqref{eq:chiaverini 34}, as % into the structure of \eqref{eq:chiaverini 34}, as
+\begin{equation}
+\label{eq:hybrid}
+    \zeta_{d} = J_1^{\dagger} \dot{x}_{1,d} + N_1 J_2^{\dagger} \left(\dot{x}_{2,d} - J_2 J_1^{\dagger} \dot{x}_{1,d}\right).
+\end{equation}
+    However, since the top-down compensation is calculated in the full joint space through \( J_2^\dagger \) and only afterward projected by \( N_1 \), the resulting compensation term may at best only partially eliminate the influence of the higher-priority task, and at worst contribute velocity components that actively counteract the desired motion of the lower-priority task.
+\end{remark} % Delvis forklart av diskusjonen tidligere nå
+
+%However, since the secondary contribution is computed in the full space via \( J_2^\dagger \) and only afterward projected by \( N_1 \), this does not solve the residual inside \( \mathrm{im}(N_1) \), potentially wasting available null-space authority.
+
+
+% a practical degree of freedom
+Unlike most robot classes, \glspl{aiauv} offer an important design parameter in the choice of the body-frame location. For fixed-base manipulators, the base frame is fixed by construction; for work-class ROVs/\glspl{uvms} it naturally resides on the hull; for humanoids and legged robots it is standardized on the pelvis or torso; and for aerial or mobile platforms with arms it is attached to the vehicle base. In contrast, the articulated body and distributed thrusters of an \gls{aiauv} make it reasonable to place the body frame anywhere along the structure.
+
+The choice of body frame is consequential: it determines which joint coordinates influence a given task. If the body frame is attached to link \( r \) and a task \( x_i \) is attached to link \( s \), then the joint block \( J^\theta_i \) of the task Jacobian contains nonzero columns only for the joints that lie on the unique kinematic path \( r\! \to\! s \). Placing the body frame farther from the task (so that the path \( r\! \to\! s \) includes more joints), the task effectively gains controllable directions through additional joint columns. Conversely, placing the body frame closer to the task reduces the number of joints on the path, making the task rely more heavily on the body twist \( \nu \). Therefore, the placement of the body frame and the definition of the tasks should be considered together, as they directly determine the degree of base reliance and joint involvement.
+
+\begin{remark}
+Relocating the body frame does not change the dimension of a task's body-sensitivity subspace. Consider a change of the body frame by $g\in SE(3)$ with adjoint $T=\mathrm{Ad}_{g}^{-1}$, then
+$J_i^{b'}=J_i^{b}T$ and $\mathcal S_i'=\mathrm{row}(J_i^{b'})=T^\top\mathcal S_i$.
+Since $T$ is invertible, $\dim(\mathcal S_i')=\dim(\mathcal S_i)$.
+\end{remark}
+
+%In practice, body–frame placement alters how $x_1$ distributes effort between base and joints and, consequently, the rank/conditioning of $J_2N_1$. When $J_2N_1$ is well conditioned with $\mathrm{rank}(J_2N_1)\approx m_2$, the projected–residual law (8) yields superior secondary tracking by exploiting the available null space; when $J_2N_1$ is rank–deficient or poorly conditioned (the algorithmic–singularity regime), the post–projection law (34) is the safer choice as it preserves the primary by construction.
+
+
+%The control laws \eqref{eq:chiaverini 8} and \eqref{eq:chiaverini 34} have different properties that affect their secondary-task performance in the presence of body-velocity sharing. \eqref{eq:chiaverini 8} adopts a project-then-invert approach, yielding a constrained least-squares solution that optimally tracks the secondary task within the primary null space. This is beneficial when precise secondary tracking is needed, but the projection can amplify numerical sensitivity near singularities. In contrast, \eqref{eq:chiaverini 34} uses an invert-then-project approach, which is simpler and more robust to singularities, but does not guarantee optimal secondary tracking.
+
+% As discussed in \cite{baerlocher1998}, the main difference between the two approaches is how the secondary task is projected into the primary tasks null space. Where the original MTP approach inverts the matrix product ${J}_2 {N}_1$, the singularity robust approach calculates the inverse separately from the matrix product. As the product can become singular even when both matrices ${J}_2$ and ${N}_1$ have full row rank (known as an algorithmic singularity), this second method has the benefit of not inverting a potentially singular matrix, but comes at the cost of worse tracking performance for the lower priority task. Further, the term $- J_2 J_1^{\dagger} \dot{{\sigma}}_{1, d}$ present in \cref{eq:zeta_d_MTP} seeks to remove velocity components in the lower-priority task originating in the motion of the main task. This term is not present in \cref{eq:zeta_d_SRMTP}, as the desired joint velocity is calculated only considering the components of the secondary task orthogonal to the main task.
+
+% The methods have been compared previously in the context of floating-base humanoid and legged robots, with \cite{baerlocher1998} concluding with superiority of the MTP approach, using damped inverses in the presence of singularities, while \cite{mistry2007} prefers the singularity-robust approach, as they find the lackluster secondary task-performance a acceptable tradeoff for singularity robust performance of the most important task. No consensus exists for which method is best, and a choice must be made based on relative importance of singularity robustness relative to lower-priority task performance.
+ %To that end, we implement a \gls{pd} controller with a hydrostatics compensation term in \Cref{sec:experiment_setup}.
+% Skal vi nevne at vi integrerer opp 
+
+%where \( \tilde{\xi} \zcoloneqq \xi_d \ominus \xi \coloneqq (p_d-p,\ \rho \epsilon_d - \rho_d \epsilon + S(\epsilon) \epsilon_d,\ \theta_d - \theta) \) and \( \tilde{\zeta} \coloneqq \zeta_d - \zeta \). Note that \( \tilde{\xi} \in \mathbb{R}^{6+n} \neq \mathbb{R}^{7+n} \ni \xi \) by definition. We only use the vector part \( \epsilon \) of the quaternion \( q \) to ensure a minimal representation of the task difference and thus \( \mathrm{dim}(\tilde{\xi}) = \mathrm{dim}(\tilde{\zeta}) \).
+
+%Ultimately, the choice between \eqref{eq:nakamura extended} and \eqref{eq:chiaverini extended} depends on the application's need for singularity robustness versus secondary-task performance. The projected-residual law \eqref{eq:nakamura extended} is preferable when accurate tracking of the secondary task is critical, and damping can be employed to manage singularities. The post-projection law \eqref{eq:chiaverini extended} is more suitable when singularity robustness is paramount, and reduced secondary-task performance is acceptable. When trajectories lie far away from any algorithmic singularities, the projected-residual control law will generally outperform the post-projection approach. However, if algorithmic singularities might be encountered, the choice between them is less clear.
+
+% \fixme{Ultimately, the choice between \eqref{eq:nakamura extended} and \eqref{eq:chiaverini extended} depends on the application's need for singularity robustness versus secondary-task performance, and the prevalence of algorithmic singularities for the chosen tasks and desired trajectories. The projected-residual law \eqref{eq:nakamura extended} provides superior task tracking when trajectories are clear of singularities. However, near or within singular configurations, it may generate large, erratic desired motions if the singularities are not properly handled. By contrast, the post-projection law \eqref{eq:chiaverini extended} is inherently robust to algorithmic singularities, and can thus be safely applied even when they are abundant, although this comes at the cost of reduced secondary-task performance across the intermediate regimes. With appropriate use of damping, the projected-residual approach can often nonetheless perform reliably at singular configurations, and in some cases still be preferable \cite{baerlocher1998}. The projected-residual law \eqref{eq:nakamura extended} is therefore generally preferable when accurate tracking of the secondary task is critical, and damping can be employed to manage singularities. } 
+
+In summary, our analysis indicates that the projected-residual law~\eqref{eq:nakamura extended} is preferable in most applications. It provides markedly better secondary-task tracking, especially under body-velocity sharing, while the additional cost is relatively small, since algorithmic singularities can be handled effectively with damping~\eqref{eq:pinv_damped}. In the \emph{compatible-task} regime,~\eqref{eq:nakamura extended} outperforms the post-projection law~\eqref{eq:chiaverini extended} without drawbacks. This view aligns with the findings of~\cite{baerlocher1998}. In the \emph{partially incompatible} regime ($\operatorname{rank}(J_2N_1)<m_2$), the trade-off becomes notable: damping typically renders~\eqref{eq:nakamura extended} reliable while preserving much of its secondary-tracking advantage, whereas~\eqref{eq:chiaverini extended} offers inherently predictable and safe primary behavior across such trajectories at the expense of secondary performance. Note that kinematic singularities of a task Jacobian affect both formulations and likewise benefit from damping. Accordingly, we recommend using the projected-residual approach by default when accurate secondary tracking matters and damping can be applied to manage singularity effects, reserving the post-projection method for cases where conservative, singularity-robust primary behavior is paramount.
+
+
+\section{Experiments}
+\label{sec:experiments}
+%This section explains the current configuration of the AIAUV, presents the experimental setup and summarizes and sicusses the results of comparing the two control laws during field tests in the Trondheimsfjord.
+% Preliminary experiments were conducted in \cite{bårsaune}, which also gives more implementation details. (Kanskje ikke så relevant)
+%
+This section presents experimental results verifying the discussion in Section \ref{sec:task_priority}. The results are based on open-water experiments conducted in the Trondheimsfjord in Norway.
+%The experiments are conducted in the open waters of the Trondheimsfjord in Norway.
+We begin by presenting the Eelume-M \gls{aiauv} and the experimental setup before comparing the two control laws \eqref{eq:nakamura extended} and \eqref{eq:chiaverini extended}.
+
+% \paragraph{Markus experiments}
+% \todo[inline]{Will see if this fits best in experiments or controller section}
+% The experiments were designed to showcase the uniqueness of the \gls{aiauv} platform, particularly in a redundancy-resolution context. \glspl{aiauv} are able to leverage the body frame placement as an explicit redundancy-resolution variable, which opens a new layer of control authority. As we change the body frame, the system Jacobian matrix follows, which alters the task Jacobians. This equates to adding or removing available \glspl{dof} from tasks.
+
+% \paragraph{Experiment/platform-specific choices}
+% Across all candidate body frames, the most interesting is perhaps the middle link.
+
+\subsection{System description}
+Here we will briefly describe the configuration and the capabilities of our Eelume-M \gls{aiauv} \cite{eelumeMseries}.
+
+In its current configuration, the robot is 6 m long and weighs 200 kg, comprising eight thrusters and four revolute joints (see \cref{fig:eely_render}). The thruster configuration enables full 6-DOF control. The thrusters are mounted across two identical modules, each containing four thrusters. Within each module, the thrusters are symmetrically arranged in pairs about the module's center. Two ducted thrusters provide lateral thrust and are vertically offset, while the other two are angled 45$^\circ$, providing both longitudinal and vertical thrust with lateral offsets. Adding the four joints, the robot has a total of 10 \glspl{dof}. The revolute joints come in pairs; each joint module contains a pitch-actuated ($y$-revolute) and yaw-actuated ($z$-revolute) joint that are nearly superimposed. Joint motions are limited to \( \pm 70^\circ \). The joint motors can provide up to 16 Nm of torque, while the thrusters provide up to 50 N of force.
+
+Our Eelume-M \gls{aiauv} is equipped with a high-performance navigation system. It fuses measurements from a \gls{dvl}, three ring-laser gyros, three accelerometers, and more. Combined, they yield accuracies of \( 0.01^\circ \) for roll and pitch, \( 0.04^\circ \) for heading, and very low drift in the position estimate.
+
+\subsection{Experimental setup}
+\label{sec:experiment_setup}
+
+%{\color{blue} Experiments were conducted with the robot tethered with a fiber optic umbilical cable to land to a control computer on land running all the code. The tests were conducted at $~20$ m depth to avoid waves, currents and varying salinity levels at the surface. Tests were conducted over multiple days, with several different sets of tasks and task trajectories, one of which was deemed representable for the rest and presented here.}
+
+%The experiments were carried out in the Trondheimsfjord from the Trondheim Biological Station (TBS). The robot was interfaced with a topside computer via a fiber-optic tether, allowing actuator commands to be transmitted and navigation data to be recorded in real time. To reduce environmental disturbances such as waves and salinity fluctuations, all tests were performed at an approximate depth of 20 m.
+
+%The experiments were conducted in the Trondheimsfjord from the Trondheim Biological Station (TBS). The robot was connected to a topside computer via a fiber-optic tether for real-time control and data collection. To minimize environmental disturbances from waves and varying salinity levels, the vehicle was operated at around 20 m depth.
+% The experiments were conducted in open-water conditions in the Trondheimsfjord. 
+% \textcolor{blue}{Ville kanskje bare ha fjerna første setning? Litt redundant og føle ikke TBS e såå viktig å nevna.}
+During experiments, the robot was connected to a topside computer via a fiber-optic tether for real-time control and data collection. To minimize environmental disturbances from waves and salinity variations, the vehicle was operated at a depth of approximately 20 m. Other environmental effects, including sea currents, were not measured directly and were not explicitly compensated for. The two experimental trials were conducted in rapid succession, such that environmental conditions can be assumed comparable.
+
+
+The experiments were designed to compare the performance of the control laws \eqref{eq:nakamura extended} and \eqref{eq:chiaverini extended}. The first design decisions are the choice of tasks and the placement of the body frame, which, as discussed in Section \ref{sec:task_priority}, should be considered together. To highlight the differences between the control laws, we selected tasks with a high degree of body-velocity sharing and placed the body frame in the middle link of the robot, ensuring an equal number of joints between the body frame and each end. Specifically, we chose the tips of the end links as task locations. This makes the tasks largely depend on the same body directions, i.e., \( \mathrm{dim}(\mathcal{S}_1 \cap \mathcal{S}_2) \) is large, without any joint coupling. Lastly, controlling the orientation of the body frame was chosen as the third task in order to avoid large deviations from its nominal orientation. The tasks can then be listed as
+% Specifically, we used tip-position tasks at the left and right end links. With the body frame placed at the mid link, the body blocks of the two task Jacobians are (up to small geometric differences) the same, \(J_{b,L}\!\approx\!J_{b,R}\), while their joint blocks act on largely disjoint joint sets. Consequently, both tasks depend on the same body-twist directions—i.e., \( \mathcal{S}_L \cap \mathcal{S}_R \) is large—while joint coupling is limited. This induces controlled body-velocity sharing and exposes how the two laws allocate the shared body motion: \eqref{eq:nakamura extended} tends to preserve it for secondary tracking, whereas \eqref{eq:chiaverini extended} projects it out when required by the primary task.
+%Several different desired task trajectories were followed using the two different controllers, \eqref{eq:nakamura extended} and \eqref{eq:chiaverini extended}, to observe their performance under different scenarios. For these tests, three tasks were defined, viz.
+\begin{subequations}
+\begin{align}
+    x_1 &\coloneqq p_t \in \mathbb{R}^3 &&\text{Tail link position}\\
+    x_2 &\coloneqq p_h \in \mathbb{R}^3 &&\text{Head link position}\\
+    x_3 &\coloneqq \epsilon \in \mathbb{R}^3 &&\text{Body-frame orientation}.
+\end{align}
+\end{subequations}
+
+%For the tests, the location of \(\{b\}\) was chosen to the geometric center of the center link, as this gives the most symmetric division of available \gls{dof} to both tasks, and coincides with the nominal center of mass (for straight joints), (which is good probably?)} \textcolor{red}{Hva betyr nominal center of mass? Ja, det er geometrisk senter av midtlinken men ikke av hele slangen}
+
+
+The desired task trajectories for \( x_1 \) and \( x_2 \) in the \(xz\)-plane are shown in \cref{fig:task_des}. The reference for task \( x_3 \) is simply the zero vector. The reference trajectories are relative to the nominal initial configuration of the robot, and from there, both ends follow arcs in the \( xz \)-plane, moving down- and inward. The signals start after 10 seconds and then move over a duration of 20 seconds with constant speed. They were designed such that they were always physically reachable by both ends simultaneously (i.e. the references were never further apart than the length of the robot). Additionally, these references can be tracked in a straightforward manner by using the joints while keeping the body-frame orientation fixed. This provokes very different solutions from the two control laws.
+
+We implemented both control laws \eqref{eq:nakamura extended}, and \eqref{eq:chiaverini extended} with $\Lambda_i = 0.1\bm{I}_{m_i},\ \forall i \in \mathcal{K}$. Moreover, constant damping was added to the projected Jacobian inversions in \eqref{eq:nakamura extended}, i.e. \( \lambda = 0.01 \) to attenuate the effects of algorithmic singularities.
+%
+%The desired task trajectories are shown in \cref{fig:task_des}, together with the corresponding trajectories from the experiments. Both ends were tasked with following arcs in the $xz$-plane, moving down- and inward, while maintaining fixed $y$-positions; the tail link was assigned higher priority than the head link. Finally, for task 3, the robot was required to maintain its base orientation. \textcolor{green}{This choice of tasks utilizes 9 of the available 10 \gls{dof}, leaving one uncontrolled. This remaining \gls{dof} gives increased freedom to the controllers in how to satisfy the declared tasks. (Allowing the differenecs between them to more clearly be brought to light)} \textcolor{red}{Hadde man hatt flere tasks ville man vel hatt like mye frihet for tasks med høyest prioritet pga null space}
+%
+% Both kinematic level control laws \eqref{eq:nakamura extended} and \eqref{eq:chiaverini extended} were implemented with $\Lambda = 0.1\bm{I}$ for all tasks. To avoid infeasible desired velocities in near-singular configurations, the projected-residual law \eqref{eq:nakamura extended} was implemented using the damped pseudoinverse \eqref{eq:pinv_damped}, with $\lambda = 0.01$. The system was initialized with straight joints at a depth of 19 m, with both ends within approximately 20 cm of their initial desired values. After initialization, the system waited 10 s before the trajectories began.
+The tasks generated reference positions and velocities for a lower-level PD+ controller, implemented as
+\begin{equation}
+    \tau =  K_p
+    \begin{bmatrix}
+        R(q)^\top(p_d-p) \\
+        -\mathrm{sgn} (\tilde{\rho}) \tilde{\epsilon} \\
+        \theta_d - \theta
+    \end{bmatrix}
+    + K_d \tilde{\zeta}
+    - \hat{g}\begin{bmatrix}
+        R(q)^T e_3 \\ 0_{3\times 1} \\ 0_{n\times 1}
+    \end{bmatrix},
+\end{equation}
+where \( K_p, K_d \succ 0 \) are gain matrices, $\tilde{\zeta} = \zeta_d - \zeta$ is the velocity error, $\hat{g} \in \mathbb{R}$  is an estimate of the restoring forces acting on the body frame, and $e_3 := [0\ 0\ 1]^T$. The orientation feedback term \( -\mathrm{sgn} (\tilde{\rho}) \tilde{\epsilon} \) is taken from \cite{fjellstad1994} where
+\begin{flalign}
+    &\hspace{-1mm}
+    \begin{bmatrix}
+        \tilde{\rho} \\
+        \tilde{\epsilon}
+    \end{bmatrix} \!\coloneqq\!
+    \begin{bmatrix}
+        \rho_d \rho + \epsilon_d^\top \epsilon \\
+        \rho \epsilon_d - \rho_d \epsilon + S(\epsilon) \epsilon_d
+    \end{bmatrix}\!,\ \mathrm{sgn}(\tilde{\rho}) \!\coloneqq\!
+    \begin{cases}
+        \phantom{-}1, & \tilde{\rho} \geq 0\\
+        -1, & \tilde{\rho} < 0.
+    \end{cases}&
+    \raisetag{1.6\baselineskip}
+\end{flalign}
+This definition of the \( \mathrm{sgn} \) function avoids an unstable equilibrium point at \( \tilde{\rho} = 0 \). The controller gains are given by
+\begin{align}
+\label{eq:Kp}
+    K_p &\!=\! \text{diag}\big(150,\,160,\,120,\,2\tfrac{180}{\pi},\,20\tfrac{180}{\pi},
+         22\tfrac{180}{\pi},\,1.5\tfrac{180}{\pi}\,1_{4\times 1}\big) \notag \\
+    K_d &\!=\! \text{diag}\big(20,\,0,\,40,\,2\tfrac{180}{\pi},\,0,\,0,
+        \tfrac{180}{\pi}\,1_{4\times 1}\big).
+\end{align}
+The gains were chosen based on extensive testing in open water for the straight configuration (i.e. \( \theta = 0_{n\times 1} \)). Notably, the proportional roll gain is very small, due to the robot's low inertia and damping in roll. 
+
+% \fixme{The translational proportional gains have units of $\mathrm{N/m}$, 
+% while the rotational proportional gains are given in $\mathrm{N\,m/rad}$. 
+% The derivative gains have units of $\mathrm{N\,s/m}$ and 
+% $\mathrm{N\,m\,s/rad}$, respectively.}
+% \textcolor{blue}{Syns det e veldig teit å ha enhet på gains... Eg ville ignorert den revieweren, men lar det ver opp te deg.}
+%roll inertia.
+This inertia is also partly the reason why roll is the only rotational \gls{dof} with added damping. Pitch and yaw, on the other hand, have large inertias and high innate damping through hydrodynamic drag. The salinity in the fjord varies and we set \( \hat{g} = -45 \text{ N} \) based on empirical data on the day of the experiments. % Trondheimsfjord
+%\textcolor{red}{Pluss lav hydrodynamisk demping i roll.}
+
+\subsection{Experimental results}
+\begin{figure}[htpb!]
+    \centering
+    \includegraphics[width=\linewidth]{figures/ICRA/comparison/task_desired_vs_actual.pdf}
+    \caption{Relative desired and actual task trajectories in the \( xz \)-plane. The trajectories are plotted in a task-relative coordinate frame with the initial task coordinates shifted to the origin}
+    \label{fig:task_des}
+\end{figure}
+
+\begin{figure}[htpb]
+    \centering
+    \includegraphics[width=\linewidth]{figures/ICRA/comparison/task_errors_all.pdf}
+    \caption{Task tracking error norms}
+    \label{fig:task_errors}
+\end{figure}
+
+
+\begin{figure}[htp]
+    \centering
+    \includegraphics[width=\linewidth]{figures/ICRA/comparison/joint_angles_scaled.pdf}
+    \caption{Joint angles}
+    \label{fig:joints}
+\end{figure}
+
+\begin{figure}[htp]
+    \centering
+    \includegraphics[width=\linewidth]{figures/ICRA/comparison/base_pose.pdf}
+    \caption{Position and orientation of the center link}
+    \label{fig:basepose}
+\end{figure}
+\setlength{\abovecaptionskip}{-2pt}
+{
+\begin{figure}[htp]
+    \centering
+    \includegraphics[width=\linewidth]{figures/ICRA/comparison/control_input.pdf}
+    \caption{Control inputs (thruster forces and joint torques)}
+    \label{fig:controlinputs}
+\end{figure}
+}
+\begin{figure}[htp]
+    \centering
+    \includegraphics[width=\linewidth]{figures/ICRA/comparison/zeta_norm.pdf}
+    \caption{Euclidian norm of the system velocities}
+    \label{fig:zeta}
+\end{figure}
+
+\begin{figure}[htp]
+    \centering
+    \includegraphics[width=\linewidth]{figures/ICRA/comparison/sigma_min.pdf}
+    \caption{Minimum singular values of \(J_2\) and \( J_2 N_1\)}
+    \label{fig:sigmamin}
+\end{figure}
+
+%\vspace{-1em}
+%\textcolor{red}{Even though lower-priority tasks are unable to kinematically affect higher-priority tasks, they can still influence them dynamically through the system's inertia and hydrodynamic couplings. This is a source of error.}
+The trajectories of the robot's ends in the \( xz \)-plane is seen in \cref{fig:task_des}. The tracking error norms for each task, using both control laws, are shown in \cref{fig:task_errors}. They have very similar initial error norms in all cases but start to differ eventually. We observe that their performance with respect to task \( x_1 \) is comparable, with their errors trending downward. However, both tasks \( x_2 \) and \( x_3 \) show clear differences between the two control laws. The projected-residual law \eqref{eq:nakamura extended} keeps the errors low while the post-projection law \eqref{eq:chiaverini extended} struggles to track the secondary tasks. After the reference signal settles (at \( t=30 \) s), \eqref{eq:chiaverini extended} drives the the secondary task errors toward zero. Together, \cref{fig:joints,fig:basepose} show how \( \xi \) evolves for both laws. It is evident that law \eqref{eq:nakamura extended} produces more motion in almost every \gls{dof}, and in particular, the base position changes significantly. The control inputs in \cref{fig:controlinputs} show that both laws produce noisy or oscillating commands, though \eqref{eq:chiaverini extended} only exhibits this behavior after around 30 seconds. We also note that the commanded joint torque from \eqref{eq:nakamura extended} is briefly saturated at 16 Nm initially. The norm of the system velocities \( \zeta \) in \cref{fig:zeta} are supported by the previous observations: the projected-residual approach produces higher and noisier velocities before the laws converge toward similar behaviors. Lastly, \cref{fig:sigmamin} shows the smallest singular values of the secondary task Jacobian \( J_2 \) and its projection onto \( N_1 \) for both laws. It is clear that \( J_2 \) remains well-posed for the duration of the motion, but its projection has at least one singular value close to zero for some time. 
+
+We start by analyzing the discrepancies between \eqref{eq:nakamura extended} and \eqref{eq:chiaverini extended} for \cref{fig:task_des,fig:task_errors}. Both laws track \( x_{1,d} \) comparably well, but the post-projection law fails to track either of the lower-priority tasks during the transient. The reason is body-velocity sharing: to realize \(x_1\), the controller exploits base motion, most notably pitch, which simultaneously drives \(x_2\) and \(x_3\). This is evident in \cref{fig:basepose}, where the pitch angle exceeds \(8^\circ\) during the transient. By construction, \eqref{eq:chiaverini extended} allows this shared body motion to pass into the lower-priority tasks, whereas \eqref{eq:nakamura extended} can compensate its propagation, whenever sufficient redundancy remains, e.g., by canceling the disturbance introduced by the base pitch used for \(x_1\).
+
+The control inputs in \cref{fig:controlinputs} reveal the projected-residual law's sensitivity to algorithmic singularities, in contrast to the post-projection law. The initial joint-torque spike coincides with a low \( \sigma_{min}(J_2N_1) \) (i.e. low smallest singular value of \(J_2N_1\)) in \cref{fig:sigmamin}, indicating operation near an algorithmic singularity. The initial configuration lies in an algorithmic-singularity neighborhood; \eqref{eq:nakamura extended} then drives the system away via aggressive joint motions, which is supported by \cref{fig:zeta}. After the transient, the commanded torques decrease as \( \sigma_{min}(J_2N_1) \) increases, i.e., as the projected secondary task Jacobian becomes better conditioned. By contrast, \eqref{eq:chiaverini extended} maintains moderate torques. The high-frequency content in \cref{fig:controlinputs} can likely be attributed to the low-level controller: its gains are not specifically tuned for large-joint-angle configurations, which causes oscillations that propagate into the control inputs. The joint angles in \cref{fig:joints} support this: \eqref{eq:nakamura extended} reaches high joint angles early and oscillate throughout, while \eqref{eq:chiaverini extended} reaches similar angles more slowly, oscillating notably only after 30 seconds.
+
+% Original Markus-versjon
+%Note that the large base translation in \cref{fig:basepose} under the projected-residual law has a clear explanation. The base position is not a controlled task; its motion is exploited to realize \(x_1\) and \(x_2\). Starting in an algorithmic-singularity neighborhood, the poor conditioning of \( J_2N_1 \) induces an unstructured initial transient: the constrained least-squares step in \eqref{eq:nakamura extended} selects motions that rapidly leave this ill-conditioned region, which can produce large base and joint motions. Once displaced, the configuration alters the Jacobians \( J_i(\xi) \), improves \( \sigma_{min}(J_2N_1) \), and opens additional feasible directions for task execution. This also explains the large yaw-joint angles (\( \theta_2,\theta_4 \)): although their columns had little alignment with \( \dot{x}_{1,d} \) and \( \dot{x}_{2,d} \) at the start, the new configuration increases their task sensitivity, making yaw motion more effective.
+
+Note that the large base translation in \cref{fig:basepose} under the projected-residual law has a clear explanation. The base position is not a controlled task; its motion is exploited to realize \(x_1\) and \(x_2\). Starting in an algorithmic-singularity neighborhood, the poor conditioning of \( J_2N_1 \) induces an unstructured initial transient that manifests as large base and joint motions. Once displaced, the configuration alters the Jacobians \( J_i(\xi) \), improves the conditioning of \( J_2N_1 \), making additional directions feasible for task execution. This also explains the large yaw-joint angles (\( \theta_2,\theta_4 \)): although their columns had little alignment with \( \dot{x}_{1,d} \) and \( \dot{x}_{2,d} \) at the start, the new configuration increases their task sensitivity, making yaw motion more effective.
+
+% Orginal chatGPT-versjon
+%Note that the large base translation observed in \cref{fig:basepose} under the projected-residual law can be traced to the poor conditioning of \( J_2N_1 \) near an algorithmic singularity. The base position itself is not a controlled task; rather, its motion appears as a by-product of the ill-posed inversion in \eqref{eq:nakamura extended}. In this region, the pseudoinverse solution is highly sensitive to small numerical variations, producing an unstructured transient that manifests as large base and joint motions. This apparent ``departure'' from the singularity should therefore not be interpreted as an active resolution strategy by the controller, but as a numerical artifact of exploiting redundant directions. Once the configuration has shifted, the altered Jacobians \( J_i(\xi) \) improve the conditioning of \( J_2N_1 \), making additional directions available for task execution. This also accounts for the large yaw-joint angles (\( \theta_2, \theta_4 \)): although initially poorly aligned with \( \dot{x}_{1,d} \) and \( \dot{x}_{2,d} \), the new configuration increases their task sensitivity, rendering yaw motion more effective.
+
+%The considered scenario, where the system starts near a singular configuration before moving into a better-conditioned one, could be thought relatively benign, as the system quickly escapes poor conditioning. The opposite situation, where trajectories drive the system deeper into singular regions, could potentially cause larger issues for the projected-residual approach. Any numerically induced motions will at best give temporary reprieve. In such cases, one will likely need to rely on more aggressively damped pseudoinverses, or the post-projection approach to achieve robust tracking in the remaining compatible task directions.
+%Kortversjon
+Importantly, the present scenario, starting in a poorly conditioned configuration and quickly moving to a better one, can be considered relatively benign. Trajectories that drive the system deeper into singular regions are potentially more challenging for the projected-residual approach \eqref{eq:nakamura extended}, as an initial transient will not improve the conditioning of the projected Jacobian's. In such cases, stronger damping or the post-projection method may be required. For the case considered here, however, the projected-residual approach generally outperformed the post-projection, with only a brief problematic transient that remained well within the system's capabilities.
+
+% "For obviosu reasons, more extreme cases were not investigated, as we don't want to break our expensive robotsnake.
+
+% Even though \eqref{eq:nakamura extended} computes the exact same first-task contribution (via \( J_1^\dagger \dot{x}_{1,r} \)), it compensates for how this motion propagates into lower-priority tasks, provided sufficient redundancy is available, for instance, by canceling the disturbance caused by the base pitch used by \( x_1 \).
+
+
+
+% The tracking error norms for each task are shown in \cref{fig:task_errors}, where one can see that the control law \eqref{eq:nakamura extended} tracks the lower-priority task references significantly better than \eqref{eq:chiaverini extended}, while achieving performance comparable to the other method for task 1. This result holds despite the use of a damped pseudoinverse with relatively large damping, which theoretically should reduce precision. Looking at the joint angles in \cref{fig:joints}, one can see that the residual-projection method utilizes the $z$-revolute joints ($\theta_2$ and $\theta_4$) to a much greater extent than the post-projection method, even though the tasks are constrained to the plane. This phenomenon can also be clearly observed by inspecting the applied control inputs in \Cref{fig:controlinputs}. Using the residual-projection control law leads to an initial spike in joint torques, saturating $\tau_2$ at $16$ Nm for \fixme{the first second(s)}. The projected-residual law also commands more aggressive thruster forces throughout the test, especially during the first 30 s.
+
+% Finn ut hvilke figurer vi skal ta med og formuler dette avsnittet
+% Finally, \cref{fig:basepose}, shows the position and attitude of the center link, and \cref{fig:zeta} shows the euclidian norm of the system velocities. Interestingly, the base orientation moves much more using the post-projection approach, while the base position, especially the $y$-component is utilized much more by the projected-residual. The plot of the system velocities confirm that the projected-residual approach causes much higher velocities for the first half of the experiment, with equivalent values after around $35$ s.
+
+%\textcolor{red}{It can be argued that in the main arenas for underwater task-priority control, the overriding objective is accurate, constraint-respecting task execution rather than energy conservation; high thruster forces and joint torques are acceptable if it reduces risk to critical infrastructure.}
+
+%{\color{red} Note that we only plot the requested control inputs, as the actual inputs can not be measured. We do not have closed-loop control of the thrusters and joints and thus the actual applied forces and torques might differ from the requested ones.}
+
+% As can be observed in \cref{fig:sigmamin}, the chosen trajectories start very near an algorithmic singularity, with the smallest singular value of the projected secondary Jacobian \(J_2N_1\) almost zero. With all joints straight, both tasks depend on base motion to generate $x$-direction movement due to body-velocity sharing. After the neighborhood of the singularity is left, the tasks are compatible, but not orthogonal. Thus showcasing the differences between the controllers
+
+% The observed performance differences between the two control approaches are consistent with their theoretical properties. In the post-projection strategy, conflicting secondary-task components are eliminated by the projection, which ensures stability but reduces accuracy. In contrast, the projected-residual method preserves more of the secondary task and thus achieves higher performance, though at the cost of larger and more aggressive control inputs, particularly when the system operates near an algorithmic singularity. In such cases, the computation of $(J_2 N_1)^{\dagger}$ becomes ill-posed, resulting in high system velocities and unpredictable motions. While a damped pseudoinverse alleviates these issues, stronger damping degrades optimality and its effects persist even after leaving the singular region.
+
+%\fixme{It should be noted that the projected-residual method's utilization of the unconstrained base \(y\)-position is not inherent to the approach itself. It is rather a consequence of numerical sensitivity to the near-singular matrix inversion. Repeating the same test may yield different trajectories due to small variations in system configuration or measurements.}
+
+% \fixme{Include comment on convergence of both laws. Post-projection still has a big job to do when the reference signals settle, as it hasn't been tracking task 2 or 3 well. However, it does actually settle (or looks like it will, eventually).}
+
+% \fixme{Noisy thruster and joint torques are likely because of oscillations that happen due to changes in inertia. Different roll gain would likely prevent this. This would then also be the reason why Nakamura oscillates all the time (joints change quickly in the start) and Chiaverini only starts oscillating after its configuration has changed sufficiently.}
+
+% \fixme{Going from well-posed to ill-posed is potentially harder for Nakamura method}
+
+\begin{figure}[htp]
+    \centering
+    \includegraphics[width=\linewidth]{figures/ICRA/eely_photo.png}
+    \caption{Eelume-M during the experiments, captured by a Blueye ROV. } % in the Trondheimsfjord
+    \label{fig:eelyphoto}
+\end{figure}
+
+\section{CONCLUSIONS AND FUTURE WORK}
+\label{sec:conclusions}
+This paper presented the first experimental comparison of two classical task-priority formulations on \glspl{aiauv}. We introduced and formalized \emph{body-velocity sharing}, showing that it often leads to an intermediate task-compatibility regime in which tasks are neither fully orthogonal, nor strictly independent. In this regime, which is frequently encountered in \glspl{aiauv}, the projected-residual law \eqref{eq:nakamura extended} and the post-projection law \eqref{eq:chiaverini extended} yield distinct behaviors. The projected-residual law achieves superior secondary-task tracking and uniquely handles the top-down disturbance term $J_2 J_1^\dagger \dot{x}_{1,d}$, but it is sensitive to algorithmic singularities; the post-projection law is more robust to such singularities, at the cost of reduced secondary-task performance. Open-water experiments with the Eelume-M confirmed these predictions: under pronounced body-velocity sharing,~\eqref{eq:nakamura extended} tracked secondary objectives more accurately, whereas~\eqref{eq:chiaverini extended} yielded more predictable behavior near algorithmic singularities. Thus, no single law is universally superior; the choice should be guided by the specific tasks, the degree of body-velocity sharing, and the desired robustness–performance trade-off.
+
+
+
+% Open-water experiments with the Eelume-M confirmed these theoretical predictions, highlighting the importance of kinematic control-law selection for practical deployments. Specifically, \eqref{eq:nakamura extended} achieves better secondary-task tracking in the presence of body-velocity sharing, while \eqref{eq:chiaverini extended} offers a more numerically robust invert-then-project computation. Only \eqref{eq:nakamura extended} is able to deal with the top-down disturbance term \( J_2 J_1^\dagger \dot{x}_{1,d} \), but this comes at the cost of numerical sensitivity. The results demonstrate that no single control law is universally superior; instead, the choice between them should be made based on the specific tasks, their body-velocity sharing characteristics, and the desired trade-offs between robustness and performance. 
+
+
+Future work will extend the analysis to more challenging sets tasks and trajectories, including the effects of kinematic singularities, and do further comparisons with other redundancy-resolution approaches and more nuanced methods for adding damping in the presence of singularities.
+%for handling the trade-off between robustness and performance.
+
+%\fixme{Such as nonconstant damping terms that makes the Jacobian-inverse better posed near singularities, while not impacting performance in compatible regions... (omformuler), }
+
+%Future work will extend the analysis to a broader range of tasks and configurations and do further comparisons with more nuanced methods for handling the trade-off between robustness and performance
+
+% or Jacobian-transpose based approaches \cite{antonelli2009}, which avoid pseudoinversion entirely.
+%investigate hybrid strategies that combine the strengths of both approaches.
+% Extend the comparison to singularity avoidance schemes?
+% Look into methods for dealing with both algorithmic and -Kinematic- singularities?
+% Compare these and other methods on a BlueROV, where velocity sharing is less consequential
+% Compare with dynamic level approaches, that makes the choice of {b} inconsequential?
+
+% As well as looking into more advanced low-level controllers, minimizing the limiting factor of low-level controller tracking perfomrance. The controllers should also further be compared against dynamic-level control approaches, which are able to utilize knowledge of the system dynamics and thus theoretically should perform better.
+
+%The experiments demonstrate the practical implications of the theoretical differences between the two control laws. The projected-residual method \eqref{eq:chiaverini 8} achieves significantly better tracking of lower-priority tasks, albeit at the cost of more aggressive control inputs and initial motion. This is particularly pronounced when starting near an algorithmic singularity, where the damped pseudoinverse mitigates but does not eliminate performance degradation. The singularity-robust method \eqref{eq:chiaverini 34} provides more stable and less aggressive control but at the expense of secondary task performance.
+
+
+
+\ifSubfilesClassLoaded{%
+  \bibliographystyle{\chosenbibstyle}
+  \bibliography{\bibfilename}
+}{}
+
+\end{document}

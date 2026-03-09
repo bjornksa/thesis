@@ -10,10 +10,8 @@
 Underwater vehicle-manipulator systems (UVMSs) are generally kinematically redundant with respect to their end-effector configuration. This redundancy can be leveraged in order to execute additional objectives simultaneously. Depending on the system at hand, it is preferable to resolve the redundancy either at the kinematic or the dynamic level. For systems with sufficiently quick dynamics, it is tractable to resolve the redundancy at the kinematic level. Conversely, for systems with slower dynamics, such an approach is generally ill-advised. Additionally, some classes of UVMSs suffer from significant coupling forces caused by joint motions \citep{Borlaug2022}. In order to instead resolve the redundancy on the dynamic level, it is possible to apply the results of \cite{Khatib2004} which extended the well-known operational space formulation (OSF) \citep{Khatib1987} to a task-priority framework.
 % Eller skal det være Khatib et al. 2004 her?
 % \begin{figure}[b]
-%      \vspace{-3mm}
 %     \centering
 %     \includegraphics[width=0.8\linewidth]{figures/IFAC23/Eelume/eelume.png}
-%      \vspace{-3mm}
 %     \caption{The Eelume AIAUV, a highly redundant UVMS}
 %     \label{fig:eel}
 % \end{figure}
@@ -562,7 +560,6 @@ We initialized the system in an S-shape (see Fig. \ref{fig:eel}) \\$(\bm{\theta}
 \begin{figure}[t]
     \centering
     \includegraphics[width=\linewidth]{figures/IFAC23/Simulation/references.png}
-    \vspace{-5mm}
   \caption{The desired base and end-effector trajectories}
   \label{fig:references}
   % Gledelig AMOS-dag!
@@ -571,7 +568,6 @@ We initialized the system in an S-shape (see Fig. \ref{fig:eel}) \\$(\bm{\theta}
  \begin{figure}[t]
     \centering
     \includegraphics[width=\linewidth]{figures/IFAC23/Simulation/base_tilde_nyeste.png}
-    \vspace{-5mm}
   \caption{Comparison of the base configuration errors using PD and STA control}
   \label{fig:base tilde}
  \end{figure}
@@ -579,7 +575,6 @@ We initialized the system in an S-shape (see Fig. \ref{fig:eel}) \\$(\bm{\theta}
  \begin{figure}[t]
     \centering
     \includegraphics[width=\linewidth]{figures/IFAC23/Simulation/ee_tilde_nyeste.png}
-    \vspace{-5mm}
   \caption{Comparison of the end-effector configuration errors using PD and STA control}
   \label{fig:ee tilde}
  \end{figure}
@@ -587,7 +582,6 @@ We initialized the system in an S-shape (see Fig. \ref{fig:eel}) \\$(\bm{\theta}
  \begin{figure}[t]
     \centering
     \includegraphics[width=\linewidth]{figures/IFAC23/Simulation/tautest.png}
-    \vspace{-5mm}
   \caption{Control forces and moments in both control laws}
   \label{fig:tau}
  \end{figure}

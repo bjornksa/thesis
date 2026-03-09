@@ -1,0 +1,954 @@
+\documentclass[../main.tex]{subfiles}
+\begin{document}
+
+\chapter{Stability of dynamic task-priority tracking controllers}
+This chapter is based on \cite{wrzos-kaminska2025}.
+
+This paper presents a robust enhancement to task-priority control methodologies for redundant robotic systems, specifically addressing vehicle-manipulator systems (VMS). A novel control law is proposed, which ensures global exponential 
+%and finite-time 
+stability of the tracking errors in non-singular configurations while providing robust performance under bounded disturbances. Additionally, we establish new, stronger stability guarantees for existing methods. The efficacy of the proposed approach is validated through simulations and a comparative study on a 7-DoF Franka Emika robot manipulator, highlighting the performance of the different control approaches in trajectory tracking and robustness. These advancements contribute to the development of robust, autonomous, and energy-efficient robotic systems for complex applications, such as underwater vehicle-manipulator systems (UVMS), enabling safer and more cost-effective operations.
+
+\section{Introduction}\label{sec:comp:intro}
+%\todo[inline,color=cyan!15]{What's the backstory and motivation here? Two similar choice of modified velocity error have been proposed within the same framework: one using the dynamically consistent velocities, and one using the original task velocities. So far, global stability properties (in the absence of singularities) have been proved for the one using dynamically consistent one, and a robust first-order sliding mode controller has been proposed and stability proved using this choice of error variable. A robust version of the controller using the original task velocities has also been proposed, but stability and convergence of all task errors in the hierarchy was not proved. In this chapter, we show that both choices give equivalent stability properties, namely global exponential stability in absence of singularities, and we propose a new robust version of the controller with the original task velocity-based error (wow what a mouthful) which we show gives global exponential stability of all tracking errors in the absence of singularities and in the presence of bounded disturbances. Simulations (and "theory-based intuition") suggests that choosing the original task velocities for the modified error variable can give improved transient performance of lower-priority tasks. (Parts of this are more abstract-like, but nice to have for paper introduction)}
+%
+
+% Kort ned redundancy-biten?
+% Motivere metoden og resultatene tidligere i introduksjonen?
+\Glspl{vms}, where a manipulator is mounted on a mobile base, are inherently redundant. Redundancy in robotic systems refers to having more actuated degrees of freedom (DoF) than are necessary to perform a given task, such as positioning and orienting an end-effector. This redundancy provides significant flexibility, enabling robots to complete tasks in multiple ways while optimizing secondary objectives like energy efficiency and collision avoidance. However, it also introduces a control challenge, as no unique solution exists for completing a task, requiring the controller to resolve this redundancy effectively. In VMS, redundancy arises naturally from the ability to choose between moving the base or the manipulator to position the end-effector, making it a core aspect of the control problem. Developing robust and efficient control methods for these systems is essential, particularly for complex applications such as underwater vehicle-manipulator systems (UVMS), where energy efficiency, robustness to disturbances, and operational safety are paramount for successful operation.
+
+A common method to utilize the system redundancy is through so-called task-priority control methods, where several control objectives are formulated as tasks with different priority levels. Redundancy resolution can generally be applied either at the kinematic level such as in \cite{Chiaverini1997}, where desired joint level velocities are calculated by one controller and sent as references to a low-level joint controller, or at the dynamic level. An introduction to several approaches at the kinematic level can be found in \cite{antonelli2009}. At the dynamic level, a dynamical model of the system is used to calculate the control inputs directly. With a good system model, these methods can take dynamical coupling effects between tasks into account, which is generally not possible using kinematic methods. Important works at the dynamic level include the operational space formulation \cite{Khatib1987}, and the passivity-based methods in \cite{Ott2015, Dietrich2020}.
+%, which was extended to enable an arbitrary number of tasks in \cite{sentis2004}
+
+Within the specific field of \gls{uvms}, there exist several works utilizing task-priority methods to handle the system redundancy. In \cite{antonelli1998}, a kinematic level control approach is applied to achieve an end-effector task while minimizing energy consumption. A more recent approach is found in \cite{Simetti2018}, while methods working on the dynamic level can be found in \cite{Brantner2021,WrzosKaminska2024}. Since \gls{uvms} are subject to both external disturbances and hard-to-model hydrodynamical effects affecting their motion, many works utilize various robust control approaches. \Gls{smc} is applied to \gls{uvms} in \cite{Dai2020,Iversflaten2022} together with kinematic level task-priority control. An analysis of the effects of modeling errors in dynamic level task-priority control of fixed-base robots is found in \cite{DiLillo2021} and extended to \gls{uvms} in \cite{IversflatenSaeboe2023}. Other approaches to increase robustness include adaptive methods such as \cite{sarkar1999}.
+
+% In \cite{slotine1988}, first-order \gls{smc} is applied in the operational space to increase the robustness of a fixed-base robot. \cite{Garofalo2021} for fixed-base systems and for \gls{uvms}
+
+In~\cite{Dietrich2020}, a tracking control law for robot manipulators for multiple, prioritized tasks was presented. This control law was then modified in~\cite{Garofalo2020} and~\cite{Saeboe2022}, both of which propose to construct a new reference velocity. These new references are constructed by adding a term ensuring convergence of the tracking error, similarly as one would when performing backstepping or designing a sliding variable. In~\cite{Garofalo2020}, the new reference is designed for the dynamically consistent task velocities, which are in a sense relative velocities, while in~\cite{Saeboe2022}, the new reference is designed for absolute task velocities. However, while the controller from~\cite{Garofalo2020} was proved to give uniform global asymptotic stability of the tracking errors in the absence of singularities, and was successfully extended into a robust first-order sliding mode controller in~\cite{DyrhaugTveter2023}, in~\cite{Saeboe2022} only local stability properties could be shown. In addition, while a more robust version of the controller was also proposed in~\cite{Saeboe2022}, convergence of the tracking errors of all tasks could not be proved.
+
+In this paper, a new robust version of the controller from~\cite{Saeboe2022} is proposed, and global exponential stability of all task errors is proved, in the absence of singularities, even with bounded disturbances if the gains are chosen sufficiently large. Additionally, the stability proof from~\cite{Saeboe2022} is extended, proving stronger stability properties than previously, namely global exponential stability of all tracking errors in the absence of singularities in the workspace. Further, the previous and the proposed robust version are compared with the control law proposed in \cite{Garofalo2020}, both theoretically and in simulation. 
+The simulation results show that the proposed control law exhibits equal robustness as the previously proposed control law while offering improved convergence behavior for lower-priority tasks. 
+% \todo[inline]{What is shown about their performance?}
+% \todo[inline]{Note that we have also rewritten the control laws and closed loop systems to put them on the same form and enable comparison. This is nontrivial and could be listed as a contribution}
+% The relation between the different control laws is summarized in \Cref{tab:comp:ctrls}.
+
+This paper is organized as follows: \Cref{sec:prelims} provides an overview of the necessary mathematical background and relevant existing work. The new robust control approach is introduced in \Cref{sec:comp:robust}, and its stability properties are analyzed. Simulations investigating the performance of the new controller and comparing it against the performance of the two existing controllers are presented in \Cref{sec:comp:simulation}. Finally, \Cref{sec:comp:summary} concludes the paper with a summary of the findings.
+
+% \begin{table}[tbh]
+% 	\centering
+% 	\caption{Existing and proposed control laws}
+% 	\label{tab:comp:ctrls}
+% 	\begin{tabularx}{\linewidth}{
+%   | >{\centering\arraybackslash}X
+%   | >{\centering\arraybackslash}X
+%   | >{\centering\arraybackslash}X | }
+% 		\cline{2-3}
+% 		\multicolumn{1}{c|}{} & New reference for dynamically consistent velocities & New reference for original task velocities   \\  \hline
+% 		No sign-term (continuous control input)  & \multicolumn{1}{c|}{\cite{Garofalo2020}} & \cite{Saeboe2022}  \\  \hline
+% 		Sign-term for robustness & \cite{DyrhaugTveter2023} & Controller proposed in \Cref{sec:comp:robust} \\ \hline
+% 	\end{tabularx}
+% \end{table}
+
+\section{Preliminaries: Control methods for multiple task tracking}\label{sec:prelims}
+
+In this section, necessary material from previous works is recounted, including an explanation of the mathematical model of VMS and a summary of the prioritized control approaches from \cite{Garofalo2020} and \cite{Saeboe2022}. The goal of the control approaches is to track desired trajectories for a set of tasks organized with strict hierarchical priorities, ensuring that higher-priority tasks are unaffected by those of lower priority. This foundational material provides the basis for describing the robust control method proposed in \Cref{sec:comp:robust}.
+
+% \todo[inline]{The idea/crash intro: Null-space projections can be used to construct a control input or reference joint velocity as a sum of inputs relating to multiple tasks, where the inputs related to lower-priority tasks are projected into the null-space of the higher priority ones so that they do not interfere with the higher-priority tasks. In order to decouple also the dynamics of the tasks, dynamically consistent projection have been used in [Relevant references]. This section introduces the coordinate transformation as presented in~\cite{Dietrich2020}, and two controllers for tracking of time-varying reference trajectories for the tasks. The controllers are from~\cite{Saeboe2022} and~\cite{Garofalo2020} (extended to \glspl{vms} in~\cite{DyrhaugTveter2023}), respectively. }
+
+\subsection{Mathematical Model}
+We consider a \gls{vms} consisting of a fully actuated $6$-DoF mobile base and an $n$-DoF manipulator arm. We present a general model that encompasses \gls{uvms} and also serves as a model for fixed-base redundant robot manipulators in the special case when the base is removed from the dynamics. The configuration of the system is given by $\bm{\xi} = [ \bm{\eta}^{\top} \  \bm{\theta}^{\top}]^{\top} \in \mathbb{R}^{n+7}$, where $\bm{\eta} = [ \bm{p}^{\top} \  \bm{q}^{\top}]^{\top} \in \mathbb{R}^3 \times \mathbb{S}^3$ is the pose of the base (with position $\bm{p}$ and orientation expressed using a unit quaternion $\bm{q}$), and $\bm{\theta} \in \mathbb{R}^n$ is the manipulator joint coordinates. The system velocities are given by the vector $\bm{\zeta} = [ \bm{\nu}^{\top} \  \dot{\bm{\theta}}^{\top}]^{\top} \in \mathbb{R}^{n+6}$, where $\bm{\nu} \in \mathbb{R}^6$ contain the linear and angular body-fixed velocities and $\dot{\bm{\theta}}$ the joint velocities. The system dynamics can be expressed as
+\begin{subequations}
+\label{eq:UVMS_dynamics}
+\begin{align}
+    \dot{\bm{\xi}} &= \bm{T}( \bm{q} ) \bm{\zeta} \\
+    \bm{M}(\bm{\theta}) \dot{\bm{\zeta}}
+    + \bm{C}(\bm{\theta}, \bm{\zeta}) \bm{\zeta}
+    + \bm{D}(\bm{\theta}, \bm{\zeta}) \bm{\zeta}
+    + \bm{g}(\bm{q},\bm{\theta}) &= \bm{\tau},
+\end{align}
+\end{subequations}
+following \cite{Antonelli2018}, with $\bm{M}, \bm{C}, \bm{D} \in \mathbb{R}^{(6+n) \times (6+n)}$. To avoid notational clutter, we will from now on omit writing matrix dependencies unless needed for clarity. Here, $\bm{M}$ is the system inertia matrix, which consists of the rigid-body inertia and, for the particular case of UVMS, also of the added-mass hydrodynamic effects. The matrix $\bm{C}$ is the Coriolis/centripetal matrix, and $\bm{D}$ is the friction or hydrodynamic damping matrix. The vector of potential forces is $\bm{g} \in \mathbb{R}^{6+n}$, and $\bm{\tau} \in \mathbb{R}^{6+n}$ is the vector of generalized input forces. The model can always be parametrized such that $\bm{M}, \bm{D}$ are symmetric positive definite and $\dot{\bm{M}} - 2\bm{C}$ is skew-symmetric \cite{Antonelli2018}.
+%including both hydrostatic restoring forces and gravitation,
+
+\subsection{Dynamically consistent task coordinates}
+
+% The method from~\cite{Dietrich2020} was originally developed for fixed-base manipulators, and applied to VMS with dynamics on the form~\eqref{eq:veh:vms_dyn} in~\cite{Saeboe2022}. The systems considered in~\cite{Saeboe2022} are actuated directly by a generalized force $\bm{\tau} \in \mathbb{R}^{6+n}$. This corresponds to setting $\bm{B}(\bm{\theta})\bm{u} = \bm{\tau}$ in~\eqref{eq:veh:vms_dyn} and treating $\bm{\tau}$ as the control input.
+
+
+% \todo[inline,color=yellow!20]{Candidates for number of tasks: q (confusing with quaternion), N (confusing with null-space? But null-space projections are always indexed), k? Leaning towards N}
+
+A task hierarchy consisting of $q \in \mathbb{N}$ tasks is considered, where each task $i=1,\ldots,q$ is defined in task-space coordinates as
+\begin{equation}
+    \bm{x}_i = \bm{h}_i (\bm{\xi})
+\end{equation}
+of dimension $m_i$. A higher index $i$ corresponds to a lower priority. The tasks are subject to the following assumptions~\cite{Dietrich2020}:
+\begin{assumption}\label{ass:tasks:dof}
+    The tasks are simultaneously feasible and the total dimension of the tasks is equal to the number  of \glspl{dof} of the system, i.e.~$\sum_{i=1}^{q} m_i = 6+n$.
+\end{assumption}
+%
+\begin{assumption}\label{ass:tasks:nonsingular}
+    The system operates within a singularity-free subset of the state space, which contains the desired trajectory $\bm{x}_d(t)$ and an open neighborhood around it.
+\end{assumption}
+
+The task-space velocities are given by
+\begin{equation}
+    \dot{\bm{x}}_i = \bm{J}_i ( \bm{\xi} ) \bm{\zeta}, \quad \bm{J}_i = \frac{\partial \bm{h}_i}{\partial \bm{\xi}} \bm{T} ( \bm{q} ) \in \mathbb{R}^{m_i \times (6+n)}.
+\end{equation}
+For each task, the objective is to track a given desired trajectory $\bm{x}_{i,d}(t)$, with tracking errors % defined as
+\todo[inline,color=yellow!20]{Bounded references and velocities?}
+\begin{equation}
+    \tilde{\bm{x}}_i = \bm{x}_i - \bm{x}_{i,d}(t).
+\end{equation}
+Augmented Jacobian matrices $\bm{J}^{\textrm{aug}}_i( \bm{\xi} )$ are obtained by stacking the Jacobians for all tasks up to and including task $i$:
+$\bm{J}^{\textrm{aug}}_i( \bm{\xi} ) = \begin{bmatrix}
+    \bm{J}_1^\top & \cdots & \bm{J}_i^\top
+\end{bmatrix}^\top$ which give the augmented task-space velocities, defined as
+\begin{equation}
+    \dot{\bm{x}}^{\textrm{aug}}_i = \bm{J}^{\textrm{aug}}_i(\bm{\xi}) \bm{\zeta},
+\end{equation}
+with $\dot{\bm{x}}^{\textrm{aug}}_i = \bigl[ \dot{\bm{x}}_1^\top,\ \ldots, \ \dot{\bm{x}}_i^\top \bigr]^\top$.
+Augmented reference and error vectors are defined analogously. Augmented quantities containing all the tasks are denoted by omitting the subscript.
+\todo[inline]{Dette er litt kronglete atm, bør omformuleres kanskje}
+
+To enforce the strict priority within the task hierarchy and avoid lower-level tasks interfering with ones of higher priority, new prioritized Jacobian matrices are found using dynamically consistent null-space projectors:
+\begin{equation}\label{eq:tasks:Ji_bar}
+    \bar{\bm{J}}_i = \bm{J}_i \bm{N}_i^\top
+\end{equation}
+where the null-space projectors $\bm{N}_i(\bm{\xi}) \in \mathbb{R}^{(6+n) \times (6+n)}$ can be found recursively as in~\cite{Wu2022}:
+\begin{equation}\label{eq:tasks:Ni}
+    \bm{N}_i = \begin{cases}
+        \bm{I}_{6+n} & \textrm{for } i= 1,\\
+        \bm{N}_{i-1}  - \bar{\bm{J}}_{i-1}^\top \bar{\bm{J}}_{i-1}^{M+,\top} & \textrm{for } i = 2,\ldots,q
+    \end{cases}
+\end{equation}
+where the operator $^{M+}$ denotes the dynamically consistent pseudoinverse, which is the weighted pseudoinverse with the mass matrix $\bm{M}$ as weight.
+
+% The null-space projectors are both kinematically and dynamically consistent, meaning that they satisfy the following equalities
+% \begin{equation} \label{eq:dynamic_consistency}
+%     \bm{J}_i \bm{N}_j = \bm{J}_i \bm{M} \bm{N}_j = \bm{0} \quad \forall i < j.
+% \end{equation}
+
+The prioritized task Jacobian matrices are used to define dynamically consistent task velocities
+\begin{equation}\label{eq:tasks:v}
+    \underbrace{\begin{bmatrix}
+        \bm{v}_1 \\ \vdots \\ \bm{v}_r
+    \end{bmatrix}}_{\bm{v}} =
+    \underbrace{\begin{bmatrix}
+        \bar{\bm{J}}_1 \\ \vdots \\ \bar{\bm{J}}_r
+    \end{bmatrix}}_{\bar{\bm{J}}} \bm{\zeta}
+\end{equation}
+% \begin{equation}
+%     \bar{\bm{J}}^{-1} = \begin{bmatrix}
+%         \bar{\bm{J}}^{M+}_1 & \cdots & \bar{\bm{J}}^{M+}_q
+%     \end{bmatrix} .
+% \end{equation}
+which are related to the original task-space velocities through
+\begin{equation}
+    \bm{v} = \underbrace{\bar{\bm{J}}(\bm{\xi}) \bm{J}^{\textrm{aug}}_q(\bm{\xi})^{-1}}_{= \bm{G}(\bm{\xi})} \dot{\bm{x}}^{\textrm{aug}}_q .
+\end{equation}
+Assumptions~\ref{ass:tasks:dof} and~\ref{ass:tasks:nonsingular} ensure that $\bar{\bm{J}}$ and $\bm{J}^{\textrm{aug}}_q$ are invertible in the considered subset of the state-space. The matrix $\bm{G}(\bm{\xi})$ is lower triangular, and can be split into submatrices $\bm{G}_{i,j} \in \mathbb{R}^{m_i \times m_j}$ where $\bm{G}_{i,i} = \bm{I}_{m_i}$, and $\bm{G}_{i,j} = \bm{0}$ for $i < j$. This gives
+\begin{equation}\label{eq:tasks:vGxdot}
+    \bm{v}_i = \dot{\bm{x}}_i + \sum_{j=1}^{i-1} \bm{G}_{i,j} \dot{\bm{x}}_j \ .
+\end{equation}
+
+Using~\eqref{eq:tasks:v}, the \gls{vms} dynamics~\eqref{eq:UVMS_dynamics} are transformed into task-space coordinates:
+\begin{equation}\label{eq:tasks:v_dyn}
+    \begin{split}
+        \underbrace{\bar{\bm{J}}^{-\top} \bm{M} \bar{\bm{J}}^{-1}}_{= \bar{\bm{M}}} \dot{\bm{v}} + \underbrace{\bar{\bm{J}}^{-\top} \left( \bm{C} -  \bm{M} \bar{\bm{J}}^{-1} \dot{\bar{\bm{J}}} \right) \bar{\bm{J}}^{-1}}_{=\bm{\mu}} \bm{v} \\
+        + \underbrace{\bar{\bm{J}}^{-\top} \bm{D} \bar{\bm{J}}^{-1}}_{= \bm{\delta}} \bm{v}  = \bar{\bm{J}}^{-\top} \left( \bm{\tau} - \bm{g} \right) .
+    \end{split}
+\end{equation}
+Due to the use of dynamically consistent null-space projections, the transformed inertia matrix $\bar{\bm{M}}$ is block-diagonal with blocks $\bar{\bm{M}}_i = \bar{\bm{J}}^{M+\top}_i \bm{M} \bar{\bm{J}}^{M+}_i$. The transformed Coriolis and damping matrices $\bm{\mu}$ and $\bm{\delta}$ are in general not block-diagonal, and therefore introduce couplings between the task dynamics to be addressed when designing the control law.
+
+
+\subsection{Tracking control}\label{sec:tasks:tracking}
+In~\cite{Dietrich2020}, the following decoupling control input was introduced, and extended in~\cite{Saeboe2022} with an extra term for canceling the hydrodynamic damping effects:
+\begin{equation}\label{eq:tasks:tau_decoupling}
+    \bm{\tau} = \bm{g} + \bm{\tau}_{\mu} + \bm{\tau}_{\delta} + \sum_{i=1}^{q} \bm{N}_i \bm{J}^\top_i \bm{F}_{i,\textrm{ctrl}}
+\end{equation}
+where $\bm{F}_{i,\textrm{ctrl}}$ is a control input for task $i$. The terms $\bm{\tau}_{\mu}$, $\bm{\tau}_{\delta}$ cancel the contributions from off-diagonal blocks of the matrices $\bm{\mu}$, $\bm{\delta}$ in~\eqref{eq:tasks:v_dyn}, and are given as:
+    \begin{align}
+        \label{eq:tasks:tau_mu}
+        \bm{\tau}_{\mu} &= \sum^{q}_{i=1} \bar{\bm{J}}_i^\top \Bigl( \sum_{j=1}^{i-1} \bm{\mu}_{i,j} \bm{v}_j + \sum_{j=i+1}^{q} \bm{\mu}_{i,j} \bm{v}_j   \Bigr)
+    \end{align}
+where $\bm{\mu}_{i,j}\in \mathbb{R}^{m_i \times m_j}$ denote blocks of the matrices $\bm{\mu}$. The expression for $\bm{\tau}_\delta$ has the same form.
+Inserting~\eqref{eq:tasks:tau_decoupling} into~\eqref{eq:tasks:v_dyn} fully decouples the dynamics of the dynamically consistent task-velocities, and the resulting dynamics of each task $i=1,\ldots,q$ are
+\begin{equation}\label{eq:tasks:vi_dot_interm}
+    \bar{\bm{M}}_i \dot{\bm{v}}_i + \left( \bm{\mu}_{i,i} + \bm{\delta}_{i,i} \right) \bm{v}_i = \bm{F}_{i,\textrm{ctrl}} .
+\end{equation}
+For the primary task, it holds that $\bm{v}_1 = \dot{\bm{x}}_1$. For the lower-priority tasks with $i \geq 2$, the dynamics~\eqref{eq:tasks:vi_dot_interm} can be transformed back into the original task coordinates by differentiating~\eqref{eq:tasks:vGxdot} and inserting for $\bm{v}_i$ and $\dot{\bm{v}}_i$, resulting in
+\begin{equation}\label{eq:tasks:x_i_ddot}
+    \bar{\bm{M}}_i \ddot{\bm{x}}_i + \left( \bm{\mu}_{i,i} + \bm{\delta}_{i,i} \right) \dot{\bm{x}}_i + \bm{\gamma}_i (\bm{\xi}, \bm{\zeta}) \begin{bmatrix}
+        \dot{\bm{x}}^{\textrm{aug}}_{i-1} \\ \ddot{\bm{x}}^{\textrm{aug}}_{i-1}
+    \end{bmatrix} = \bm{F}_{i,\textrm{ctrl}}
+\end{equation}
+where
+% \begin{subequations}\label{eq:tasks:gamma}
+%     \begin{equation}
+%         \bm{\gamma}_i (\bm{\xi}, \bm{\zeta}) = \left[\bm{\Gamma}_{i,1}, \ldots ,\bm{\Gamma}_{i,i-1}, \bm{\Psi}_{i,1}, \ldots,\bm{\Psi}_{i,i-1}  \right]
+%     \end{equation}
+%     \begin{equation}
+%         \bm{\Gamma}_{i,j} = \left( \bm{\mu}_{i,i} + \bm{\delta}_{i,i} \right) \bm{G}_{i,j} + \bar{\bm{M}}_i \dot{\bm{G}}_{i,j}, \; \bm{\Psi}_{i,j} = \bar{\bm{M}}_i \bm{G}_{i,j}.
+%     \end{equation}
+% \end{subequations}
+\begin{equation}\label{eq:comp:gamma_expanded}
+    \begin{split}
+        \bm{\gamma}_i (\bm{\xi}, \bm{\zeta}) \begin{bmatrix}
+        \dot{\bm{x}}^{\textrm{aug}}_{i-1} \\ \ddot{\bm{x}}^{\textrm{aug}}_{i-1}
+        \end{bmatrix} =
+        \sum_{j=1}^{i-1} &\bigg( \bar{\bm{M}}_i ( \dot{\bm{G}}_{i,j} \dot{\bm{x}}_{j} + \bm{G}_{i,j} \ddot{\bm{x}}_{j}  ) \\[-5pt]
+        & \ + (\bm{\mu}_{i,i}  + \bm{\delta}_{i,i}) \bm{G}_{i,j} \dot{\bm{x}}_{j} \vphantom{\dot{\bm{G}}} \bigg),
+    \end{split}
+\end{equation}
+describes the top-down disturbance from higher-priority tasks.
+
+To design the task level control input in~\cite{Saeboe2022}, a modified reference velocity $\dot{\bm{x}}_{i,r}$ was introduced for each task, chosen to be
+\begin{equation}\label{eq:tasks:xir}
+    \dot{\bm{x}}_{i,r} = \dot{\bm{x}}_{i,d} - \bm{\Lambda}_i \tilde{\bm{x}}_i
+\end{equation}
+where the matrix $\bm{\Lambda}_i = \bm{\Lambda}_i^\top > 0$ is a design parameter \todo{gain matrix to be chosen? Give dimensions?}. A new error variable is defined as\footnote{Note that in the original paper~\cite{Saeboe2022}, this variable is denoted $\bm{s}_i$. It is renamed $\bm{z}_i$ here to avoid conflicting notation with $\bm{s}_i$ from \cite{Garofalo2020}.}
+\begin{equation}\label{eq:tasks:zi}
+    \bm{z}_i = \dot{\bm{x}}_i - \dot{\bm{x}}_{i,r}  = \dot{\tilde{\bm{x}}}_i + \bm{\Lambda}_i \tilde{\bm{x}}_i
+\end{equation}
+and the control input $\bm{F}_{i,\textrm{ctrl}}$ to each task chosen as
+\begin{multline}\label{eq:tasks:Fictrl}
+        \bm{F}^{\textrm{A}}_{i,\textrm{ctrl}} = \bar{\bm{M}}_i \ddot{\bm{x}}_{i,r} + \left( \bm{\mu}_{i,i} + \bm{\delta}_{i,i} \right) \dot{\bm{x}}_{i,r} - \bm{K}_{D,i} \bm{z}_i - \bm{K}_{P,i} \tilde{\bm{x}}_i 
+        \\
+        + \bm{\gamma}_i \begin{bmatrix} \dot{\bm{x}}^{\textrm{aug}}_{i-1,d} \\ \ddot{\bm{x}}^{\textrm{aug}}_{i-1,d}
+        \end{bmatrix}
+\end{multline}
+where $\bm{K}_{P,i},\, \bm{K}_{D,i}$ are positive definite gain matrices. The resulting closed-loop dynamics for each task $i$ are given as
+\begin{subequations}\label{eq:tasks:CL_task_i}
+    \begin{align}
+        \dot{\tilde{\bm{x}}}_i &= -\bm{\Lambda}_i \tilde{\bm{x}}_i + \bm{z}_i \label{eq:tasks:CL_xitildedot}\\
+        \bar{\bm{M}}_i \dot{\bm{z}}_i &+ \left( \bm{\mu}_{i,i} + \bm{\delta}_{i,i} + \bm{K}_{D,i} \right) \bm{z}_i + \bm{K}_{P,i} \tilde{\bm{x}}_i + \bm{\gamma}_i \begin{bmatrix} \dot{\tilde{\bm{x}}}^{\textrm{aug}}_{i-1} \\ \ddot{\tilde{\bm{x}}}^{\textrm{aug}}_{i-1}
+        \end{bmatrix}  = \bm{0} \label{eq:tasks:CL_zidot}
+    \end{align}
+\end{subequations}
+The origin, in $\tilde{\bm{x}}$- and $\bm{z}$-coordinates, is shown to be locally \gls{uas}~\cite{Saeboe2022}. A more robust version of the controller was also proposed in~\cite{Saeboe2022}, with task level control input given as
+\begin{multline}\label{eq:comp:F_ictrl_robust_z}
+    \bm{F}^{\textrm{D}}_{i,\textrm{ctrl}} = \bar{\bm{M}}_i \ddot{\bm{x}}_{i,r} + \left( \bm{\mu}_{i,i} + \bm{\delta}_{i,i} \right) \dot{\bm{x}}_{i,r} - \bm{K}_{D,i} \bm{z}_i - \bm{K}_{P,i} \tilde{\bm{x}}_i \\
+    + \bm{K}_{s,i} \sgn(\bm{z}_i)
+    + \bm{\gamma}_i \begin{bmatrix} \dot{\bm{x}}^{\textrm{aug}}_{i-1,d} \\ \ddot{\bm{x}}^{\textrm{aug}}_{i-1,d}
+    \end{bmatrix},
+\end{multline}
+where $\textrm{sgn}(\cdot)$ is an element-wise sign function and $\bm{K}_{s,i} \in \mathbb{R}^{m_i \times m_i}$  is a positive definite, diagonal gain matrix with diagonal elements $K_{s,ik}, ~k=1,\ldots,m_i$. However, the analysis was limited, and convergence of the tracking errors of the entire stack of tasks could not be proved.
+\todo[inline]{Vil kanskje omformulere denne litt}
+
+%\subsubsection{Tracking using a modified velocity reference for dynamically consistent task velocities}
+A similar approach was proposed in~\cite{Garofalo2020}, using a modified reference velocity $\bm{v}_r$ for the dynamically consistent task velocities $\bm{v}$ instead of $\dot{\bm{x}}$. The controller was extended from fixed-based manipulators to \glspl{uvms} in~\cite{DyrhaugTveter2023}. The method  allows the task hierarchies to have a larger total dimension than the number of \glspl{dof} of the manipulator system executing the tasks, but to allow for a comparison, we will only consider scenarios in which Assumptions~\ref{ass:tasks:dof} and~\ref{ass:tasks:nonsingular} hold.
+
+Specifically, in~\cite{Garofalo2020}, a modified reference velocity $\bm{v}_r$ is introduced for the dynamically consistent task velocities. In the case where Assumptions~\ref{ass:tasks:dof} and~\ref{ass:tasks:nonsingular} hold so that $\bm{J}^{\textrm{aug}}_q$ and $\bar{\bm{J}}$ are invertible, the modified reference velocity can be written
+\begin{equation}
+    \bm{v}_r = \bm{G}(\bm{\xi}) \dot{\bm{x}}_d - \bm{\Lambda} \tilde{\bm{x}}
+\end{equation}
+where $\bm{\Lambda}$ is a block diagonal matrix with positive-definite blocks $\bm{\Lambda}_i \in \mathbb{R}^{m_i \times m_i}$. The new error variable $\bm{s}$, sometimes referred to as a sliding variable, is defined as $\bm{s} = \bm{v} -\bm{v}_r $. The control input is (adapted for \gls{uvms} in \cite{DyrhaugTveter2023})
+\begin{equation}\label{eq:tasks:tau_Garofalo}
+    \bm{\tau}^{\textrm{E}} = \bm{g} + \bar{\bm{J}}^\top \left( \bar{\bm{M}} \dot{\bm{v}}_r + \left( \bm{\mu}_d + \bm{\delta}_d \right) \bm{v}_r + \left( \bm{\mu}_s + \bm{\delta}_{od} \right) \bm{v} - \bm{K}_D \bm{s}\right)
+\end{equation}
+where $\bm{\mu}_d$ and $\bm{\delta}_d$ denote the block-diagonal parts of $\bm{\mu},\, \bm{\delta}$, respectively, and $\bm{\mu}_s = \bm{\mu} - \bm{\mu}_d$ and $\bm{\delta}_{od} = \bm{\delta} - \bm{\delta}_d$, with the former being skew-symmetric, and $\bm{K}_D$ is a block-diagonal gain matrix with positive-definite blocks $\bm{K}_{D,i} \in \mathbb{R}^{m_i \times m_i}$.
+\todo[inline]{fix notation so that the gain D is not confused with the damping matrix}
+
+Under Assumptions~\ref{ass:tasks:dof} and~\ref{ass:tasks:nonsingular}, the two variables $\bm{s}$ and $\bm{z}$ are related through $\bm{s} = \bm{G} \bm{z}$. Consequently, $\bm{s}$ can be written as $\bm{s} = [\bm{s}_1^\top,\, \ldots,\, \bm{s}_q^\top]^\top$ with
+\begin{equation}\label{eq:comp:si}
+    \bm{s}_i = \bm{z}_i + \sum_{j=1}^{i-1} \bm{G}_{i,j} \dot{\tilde{\bm{x}}}_{j},
+\end{equation}
+which, together with \Cref{eq:tasks:vGxdot} leads to
+\begin{equation}\label{eq:tasks:s_v_xr}
+    \bm{s}_i = \bm{v}_i - \dot{\bm{x}}_{i,r}
+\end{equation}
+Utilizing \Cref{eq:comp:gamma_expanded,eq:tasks:vGxdot,eq:tasks:s_v_xr}, the control input \Cref{eq:tasks:tau_Garofalo} can be shown to be equivalent to the decoupling input~\eqref{eq:tasks:tau_decoupling} with
+\begin{equation}
+    \bm{F}_{i, {\rm ctrl}}^{\textrm{E}} = \bar{\bm{M}}_i \ddot{\bm{x}}_{i,r} + \left( \bm{\mu}_{i,i} + \bm{\delta}_{i,i} \right) \dot{\bm{x}}_{i,r} - \bm{K}_{D,i} \bm{s}_i
+    + \bm{\gamma}_i
+    \begin{bmatrix} \dot{\bm{x}}^{\textrm{aug}}_{i-1,d} \\ \ddot{\bm{x}}^{\textrm{aug}}_{i-1,d}
+    \end{bmatrix}
+\end{equation}
+The resulting closed-loop dynamics are then
+\begin{subequations}\label{eq:tasks:CL_Garofalo}
+    \begin{align}
+        \dot{\tilde{\bm{x}}} &= - \bm{G}^{-1} \bm{\Lambda} \tilde{\bm{x}} + \bm{G}^{-1} \bm{s} \label{eq:tasks:CL_Garofalo_xtildedot}\\
+        \bar{\bm{M}} \dot{\bm{s}} &= - \left( \bm{\mu}_d + \bm{\delta}_d + \bm{K}_D \right) \bm{s}. \label{eq:tasks:CL_Garofalo_sdot}
+    \end{align}
+\end{subequations}
+In the case where no singularities exist, i.e.~if $\bar{\bm{J}}$ is always nonsingular,  the origin is proved to be \gls{ugas}~\cite{Garofalo2020,DyrhaugTveter2023}. A robust approach was also proposed in \cite{DyrhaugTveter2023}, with control input equivalent to using the decoupling input~\eqref{eq:tasks:tau_decoupling} with
+\begin{multline}\label{eq:comp:Fictrl_SM}
+    \bm{F}_{i,\textrm{ctrl}}^{\textrm{B}} = \bar{\bm{M}}_i \ddot{\bm{x}}_{i,r} + \left( \bm{\mu}_{i,i} + \bm{\delta}_{i,i} \right) \dot{\bm{x}}_{i,r} - \bm{K}_{D,i} \bm{s}_i \\
+    - \bm{K}_{s,i} \textrm{sgn} (\bm{s}_i) + \bm{\gamma}_i
+    \begin{bmatrix} \dot{\bm{x}}^{\textrm{aug}}_{i-1,d} \\ \ddot{\bm{x}}^{\textrm{aug}}_{i-1,d}
+    \end{bmatrix}.
+\end{multline}
+This modification is shown to be \gls{ugas} in the presence of a bounded disturbance. All the discussed control laws along with the new proposed methods are summarized in \Cref{tab:comp:ctrls}.
+
+% \begin{equation}
+%     \bm{s}_i = \sum_{j=1}^{i-1} \bm{J}_i \bar{\bm{J}}_j^{M+} ( \bm{s}_j - \bm{\Lambda}_j \tilde{\bm{x}}_j ) + \sum_{j=1}^{i-1} \left( \bm{G}_{i,j} \dot{\tilde{\bm{x}}}_i \right)
+% \end{equation}
+% \begin{multline}
+%     \label{eq:comp:tau_SM}
+% 	\bm{\tau} = \bm{g} + \bar{\bm{J}}^\top \left[ \bar{\bm{M}} \dot{\bm{v}}_r + \left( \bm{\mu}_d + \bm{\delta}_d \right) \bm{v}_r + \left( \bm{\mu}_s + \bm{\delta}_{od} \right) \bm{v} - \bm{K}_D \bm{s} \right. \\
+%     \left. - \bm{K}_s \textrm{sgn}(\bm{s}) \right]
+% \end{multline}
+\section{New stability analysis of existing controllers}\label{sec:comp:analysis}
+
+
+
+
+%\todo[inline,color=cyan!15]{Outline of the theory part: First, derive the dynamics in the $s$-coordinate, since that motivates the robust controller. Proposition: GES, then robust controller then GES of the robust controller. Then, ta-daa, funfact: Garofalo is also GES (and so is the first-order SMC, but that follows by the staring method). Conclusion: both versions give equivalent stability properties.}
+
+
+This section presents new analysis of the controllers from~\cite{Saeboe2022} and~\cite{Garofalo2020}, which were introduced in \Cref{sec:tasks:tracking}. Here, stronger stability properties than previously are established for both controllers, namely that both controllers give exponential stability of the traching errors, and global exponential stability in the absence of singularities.
+First, the controller from~\cite{Saeboe2022}, given in \Cref{sec:tasks:tracking} by~\eqref{eq:tasks:tau_decoupling},~\eqref{eq:tasks:Fictrl}, and resulting closed-loop system are rewritten using the coordinate choice from~\cite{Garofalo2020} also introduced in \Cref{sec:tasks:tracking}. This rewriting of the system enables\todo{paves the way? facilitates?} two of the main contributions in this chapter. First, it can be used to show that the controller from~\cite{Saeboe2022} renders the origin \gls{ugas} and, in fact, \gls{ges} in the complete absence of singularities. Second, it enables the addition of an extra term to the controller from~\cite{Saeboe2022} later in \Cref{sec:comp:robust} to make it robust against bounded disturbances while retaining the stability properties\todo{Incredibly long sentence, figure it out later}.
+
+
+% At the end of this section we show for completeness that the controller from~\cite{Garofalo2020} also results in~\gls{ges} at the origin. In other words, we show that the two controllers~\eqref{eq:tasks:tau_decoupling},~\eqref{eq:tasks:Fictrl} and~\eqref{eq:tasks:tau_Garofalo}, from~\cite{Saeboe2022} and~\cite{Garofalo2020} respectively, both give equivalent stability properties of the respective resulting closed-loop systems.
+
+
+
+%First, we prove that the tracking controller from~\cite{Saeboe2022}, given by~\eqref{eq:tasks:tau_decoupling},~\eqref{eq:tasks:Fictrl}, renders the origin \gls{ugas} and, in fact, \gls{ges} in the complete absence of singularities. We also show that the controller from~\cite{Garofalo2020} likewise gives global exponential stability of the origin
+
+\subsection{Global exponential stability}
+\todo[inline]{Find a better section name}
+
+
+
+\begin{proposition}\label{prop:comp:GES}
+    Let \Cref{ass:tasks:dof,ass:tasks:nonsingular} be satisfied. Then the origin of the closed-loop system~\eqref{eq:tasks:CL_task_i} is \gls{es}\todo[color=yellow!20]{Use ES or LES consistently}. Furthermore, if \Cref{ass:tasks:nonsingular} holds globally, i.e.~if $\bm{J}^{\textrm{aug}}$ is invertible for all states, the origin of the closed-loop system~\eqref{eq:comp:CL} is \gls{ges}.
+\end{proposition}
+\todo[inline,color=yellow!20]{Is this worthy of being called a theorem maybe?}
+\todo[inline]{Strictly speaking, Khalil (and Araki) assume that the system is Lipschitz. In the case here, with exponential stability, this isn't necessary as will be seen later in the robust version where we use the comparison lemma.}
+
+\begin{proof}
+    We consider first the closed-loop dynamics in the new coordinates~\eqref{eq:comp:CL}. In the case when $\bar{\bm{J}}$ is invertible, the inverse matrix $\bm{G}^{-1}$ is given by~\cite{Garofalo2020} as
+    \begin{equation}
+        \bm{G}^{-1} = \bm{J}^{\textrm{aug}} \bar{\bm{J}}^{-1} = \begin{bmatrix}
+            \bm{I}_{m_1} & \bm{0}_{m_1 \times m_2} & \cdots & \bm{0}_{m_1 \times m_q}\\
+            \bm{J}_2 \bar{\bm{J}}^{M+}_1 & \bm{I}_{m_2} & \cdots & \bm{0}_{m_2 \times m_q}\\
+            \vdots & \vdots & \ddots & \vdots \\
+            \bm{J}_q \bar{\bm{J}}^{M+}_1 & \bm{J}_q \bar{\bm{J}}^{M+}_2 & \cdots & \bm{I}_{m_q}
+        \end{bmatrix} .
+    \end{equation}
+    The system~\eqref{eq:comp:CL} can be written into an interconnected system consisting of $q$ subsystems, corresponding to each task, with subsystem number $i$ for $i=1,\ldots,q$ given by
+    \begin{subequations} \label{interconnection}
+        \begin{equation}
+            \dot{\tilde{\bm{x}}}_i = -\bm{\Lambda}_i \tilde{\bm{x}}_i + \bm{s}_i + \sum_{j=1}^{i-1} \bm{J}_i \bar{\bm{J}}_j^{M+} \left( \bm{s}_j - \bm{\Lambda}_j \tilde{\bm{x}}_j \right) \label{eq:comp:xitilde_dot}
+        \end{equation}
+        \begin{multline}
+            \bar{\bm{M}}_i \dot{\bm{s}}_i + (\bm{\mu}_{i,i} + \bm{\delta}_{i,i}) \bm{s}_i + \bm{D}_i \bm{s}_i + \bm{D}_i \sum_{j=1}^{i-1} \bm{J}_i \bar{\bm{J}}_j^{M+} \left( \bm{s}_j - \bm{\Lambda}_j \tilde{\bm{x}}_j \right) \\
+            + \bm{K}_{P,i} \tilde{\bm{x}}_i = \bm{0} .
+        \end{multline}
+    \end{subequations}
+    %
+    For each subsystem, take the Lyapunov function candidate
+    \begin{equation}\label{eq:comp:Vi}
+        V_i(\tilde{\bm{x}}_i,\bm{s}_i) = \tfrac{1}{2} \tilde{\bm{x}}_i^\top \bm{K}_{P,i} \tilde{\bm{x}}_i + \tfrac{1}{2} \bm{s}_i^\top\bar{\bm{M}}_i \bm{s}_i .
+    \end{equation}\todo[inline,color=yellow!20]{Strictly speaking, $V_i$ is a function of $\theta$ as well }
+    Differentiating $V_i$ gives
+    \begin{equation}
+        \begin{split}
+            \dot{V}_i
+            % =&
+            % \tilde{\bm{x}}_i^\top  \bm{K}_{P,i}  \left(
+            % -\bm{\Lambda}_i \tilde{\bm{x}}_i + \bm{s}_i
+            % + \sum_{j=1}^{i-1} \bm{J}_i \bar{\bm{J}}_j^{M+} ( \bm{s}_j - \bm{\Lambda}_j \tilde{\bm{x}}_j )
+            % \right)\\
+            % & + \bm{s}_i^\top \left(
+            % -(\bm{\mu}_{i,i} + \bm{\delta}_{i,i}) \bm{s}_i - \bm{D}_i \bm{s}_i - \bm{D}_i \sum_{j=1}^{i-1} \bm{J}_i \bar{\bm{J}}_j^{M+} ( \bm{s}_j - \bm{\Lambda}_j \tilde{\bm{x}}_j) - \bm{K}_{P,i} \tilde{\bm{x}}_i
+            % \right) \\
+            % &+ \tfrac{1}{2} \bm{s}_i^\top \dot{\bar{\bm{M}}}_i \bm{s}_i\\
+            =& - \tilde{\bm{x}}_i^\top  \bm{K}_{P,i} \bm{\Lambda}_i \tilde{\bm{x}}_i - \bm{s}_i^\top( \bm{\delta}_{i,i} + \bm{D}_i) \bm{s}_i \\
+            &+ \left[ \tilde{\bm{x}}_i^\top \ \bm{s}_i^\top \right]
+            \begin{bmatrix}
+                \bm{K}_{P,i} & \bm{0} \\ \bm{0} & \bm{D}_i
+            \end{bmatrix}
+            \begin{bmatrix}
+                \bm{I}_{m_i} \\ -\bm{I}_{m_i}
+            \end{bmatrix} \\
+            &\qquad \cdot
+            \sum_{j=1}^{i-1}
+                \bm{J}_i \bar{\bm{J}}_j^{M+}
+            \begin{bmatrix}
+                -\bm{I}_{m_j} & \bm{I}_{m_j}
+            \end{bmatrix}
+            \begin{bmatrix}
+                \bm{\Lambda}_j & \bm{0} \\ \bm{0} & \bm{I}_{m_j}
+            \end{bmatrix}
+            \begin{bmatrix}
+                \tilde{\bm{x}}_j \\ \bm{s}_j
+            \end{bmatrix}\mspace{-36mu}
+        \end{split}
+    \end{equation}
+    using \Cref{interconnection} and the fact that $\dot{\bar{\bm{M}}}_i-2\bm{\mu}_{i,i}$ is skew-symmetric.
+    %
+    The cross-terms due to the top-down disturbance from other tasks can be bounded by the product of the norms of each matrix and vector in the term, arriving at
+    \begin{equation}
+        \dot{V}_i \leq -\alpha_i \Vert \bm{y}_i \Vert + \sum_{j=1}^{i-1} \beta_{ij} \Vert \bm{y}_i \Vert \cdot \Vert \bm{y}_j \Vert
+    \end{equation}
+    where $\bm{y}_i = \left[ \tilde{\bm{x}}_i^\top \ \bm{s}_i^\top \right]^\top$, and
+    \begin{subequations}\label{eq:comp:alphabeta}
+        \begin{align}
+            \alpha_i ={}& \min \left( \lambda_{\min}(\bm{K}_{P,i} \bm{\Lambda}_i), \lambda_{\min}(\bm{\delta}_{i,i} + \bm{D}_i)\right),\\
+            \begin{split}
+                \beta_{ij}
+                % ={}& \max \left( \lambda_{\max}(\bm{K}_{P,i} ), \lambda_{\max}(\bm{D}_i)\right)\cdot \sigma_{\max}\left( \left[ \begin{smallmatrix}
+                %     \bm{I}_{m_i} \\ -\bm{I}_{m_i}
+                % \end{smallmatrix}\right] \right) \\
+                % &\cdot \sigma_{\max}( \bm{J}_i \bar{\bm{J}}_j^{M+} )
+                % \cdot \sigma_{\max}\left( \left[ \begin{smallmatrix}
+                %     -\bm{I}_{m_j} \\ \bm{I}_{m_j}
+                % \end{smallmatrix}\right] \right) \cdot \max \left( \lambda_{\max}(\bm{\Lambda}_j),1\right)\\
+                ={}& 2 \max \left( \lambda_{\max}(\bm{K}_{P,i} ), \lambda_{\max}(\bm{D}_i)\right)\cdot \sigma_{\max}( \bm{J}_i \bar{\bm{J}}_j^{M+} ) \\
+                &\cdot \max \left( \lambda_{\max}(\bm{\Lambda}_j),1\right)
+            \end{split}
+        \end{align}
+    \end{subequations}
+    \todo[inline]{Say why $\sigma$'s are bounded? They are bounded if the task Jacobians are bounded and full rank or the dynamically consistent pseudoinverse is computed "safely" as in~\cite{Garofalo2020}.}
+    %
+    Now let $V(\bm{y}) = \sum_{i=1}^{q} a_i V_i(\bm{y}_i)$, where $\bm{y} = [\bm{y}_1^\top,\, \ldots,\, \bm{y}_q^\top]^\top$  and $a_i$, $i=1,\ldots,q$ are positive constants. Then
+    \begin{equation}\label{eq:comp:Vdot_bound}
+        \dot{V} \leq -\tfrac{1}{2} \bm{\phi}^\top (\bm{A} \bm{\Sigma} + \bm{\Sigma}^\top \bm{A} ) \bm{\phi}
+    \end{equation}
+    where $\bm{\phi} = \left[ \Vert \bm{y}_1 \Vert,\, \ldots,\, \Vert \bm{y}_q \Vert   \right]^\top$, $\bm{A} \in \mathbb{R}^{q\times q}$ is a diagonal matrix with the coefficients $a_i$ along its diagonal, and the matrix $\bm{\Sigma}\in \mathbb{R}^{q\times q}$ is given by
+    \begin{equation}\label{eq:comp:S}
+        \bm{\Sigma} = \begin{bmatrix}
+            \alpha_1 & 0 & \cdots & 0\\
+            -\beta_{21} & \alpha_2 & \cdots & 0\\
+            \vdots & \vdots & \ddots & \vdots\\
+            -\beta_{q1} & -\beta_{q2} & \cdots & \alpha_q
+            \end{bmatrix} .
+    \end{equation}
+    %
+    By \cite[Lemma 9.7]{Khalil}, there exist constants $a_i$ such that the matrix $\bm{A} \bm{\Sigma} + \bm{\Sigma}^\top \bm{A}$ is positive definite if and only if $\bm{\Sigma}$ is a nonsingular M-matrix, i.e.~all its off-diagonal elements are nonpositive and all leading principal minors are strictly positive. Since $\bm{\Sigma}$ is a lower-triangular matrix with strictly positive elements on the diagonal and nonpositive elements below it, it is an M-matrix.
+    % Then by \cite[Theorem 9.2]{Khalil}, the origin of the system~\eqref{eq:comp:CL} is \gls{uas}, and \gls{ugas} if \Cref{ass:tasks:nonsingular} holds globally. At the origin, from~\eqref{eq:comp:CL_xtildedot} it follows that $\dot{\tilde{\bm{x}}} = 0$, and consequently from~\eqref{eq:comp:si} it follows that $\bm{z} = 0$, i.e.~that the origin in $(\tilde{\bm{x}},\bm{s})$- and $(\tilde{\bm{x}},\bm{z})$-coordinates coincides. Thus the origin of~\eqref{eq:tasks:CL_task_i} is \gls{ugas} if there are no singularities.
+
+    To prove exponential stability, we rewrite $V$ as
+    \begin{equation}
+        V(\bm{y}) = \tfrac{1}{2} \bm{y}^\top \underbrace{\left[ \begin{smallmatrix}
+        a_1 \bm{K}_{P,1} & 0 & \cdots & 0 & 0 \\
+        0 & a_1 \bar{\bm{M}}_1 & \cdots & 0 & 0 \\
+        \vdots & & \ddots & & \vdots \\
+        0 & 0 & \cdots & a_q \bm{K}_{P,q} & 0\\
+        0 & 0 & \cdots & 0 & a_q \bar{\bm{M}}_q
+        \end{smallmatrix} \right]}_{=\bm{P}} \bm{y} ,
+    \end{equation}
+    and since $\bm{K}_{P,i}$, $\bar{\bm{M}}_i$ are positive definite matrices for all $i=1,\ldots,q$, we can choose $k_1 = \frac{1}{2} \lambda_{\min}(\bm{P}) > 0$ and $k_2 = \frac{1}{2} \lambda_{\max}(\bm{P})$ s.t.
+    \begin{equation}\label{eq:comp:Vbounds}
+        k_1 \Vert \bm{y} \Vert^2 \leq V \leq k_2 \Vert \bm{y} \Vert^2 .
+    \end{equation}
+    Since $\bm{\Sigma}$ is a nonsingular M-matrix, we can bound $\dot{V}$ by
+    \begin{equation}
+        \dot{V} \leq -\tfrac{1}{2} \bm{\phi}^\top (\bm{A} \bm{\Sigma} + \bm{\Sigma}^\top \bm{A} ) \bm{\phi} \leq - \tfrac{1}{2} \lambda_{\min}(\bm{A} \bm{\Sigma} + \bm{\Sigma}^\top \bm{A}) \Vert \bm{\phi} \Vert^2
+    \end{equation}
+    where $\lambda_{\min}(\bm{A} \bm{\Sigma} + \bm{\Sigma}^\top \bm{A}) > 0$. Finally, by noting that
+    \begin{equation}
+        \Vert \bm{\phi} \Vert^2 = \sum_{i=1}^{q} \Vert \bm{y}_i \Vert^2
+        = \sum_{i=1}^{q} \sum_{j=1}^{m_i} y_{i,j}^2 = \Vert \bm{y} \Vert^2
+    \end{equation}
+    where $y_{i,j}$ denotes the $j$th element of $\bm{y}_i$, we can conclude that $V$ satisfies the conditions of~\cite[Theorem 4.10]{Khalil}. Thus the origin is \gls{es}, and \gls{ges} if there are no singularities.
+\end{proof}
+
+% The assumption that $\bm{J}^{\textrm{aug}}$ is invertible in the whole state-space of the original system is difficult to guarantee in practice, but is common in the literature \cite{Dietrich2020, Garofalo2020}. 
+The assumption that $\bm{J}^{\textrm{aug}}$ is invertible in the relevant part of the state-space is common in the literature \cite{antonelli2009, Dietrich2020, Garofalo2020, Wu2022}, but restricts the choice of task combinations. In practice, choosing tasks which satisfy this assumption can be difficult and requires good planning, which is outside the scope of this paper.
+However, the property of ``global stability in the absence of singularities" indicates that convergence can be achieved for any magnitude of initial errors, so long as no singularities are encountered.
+This could not be concluded in~\cite{Saeboe2022} or for the tracking controller in~\cite{Dietrich2020}, where theorems giving local stability properties were applied.
+
+%the magnitude of initial errors is not\todo{the problem} an obstacle to completing the objectives, but only whether singularities are encountered.
+
+
+
+
+
+% \subsection{Global exponential stability of the other controller (RENAME)}
+% \todo[inline,color=red!20]{This section is probably the first thing to be removed from the conference paper}
+% For completeness, in this section it is proved that the control law~\eqref{eq:tasks:tau_Garofalo} from~\cite{Garofalo2020} also results in exponential stability of the origin.
+
+% The closed-loop dynamics~\eqref{eq:tasks:CL_Garofalo} can be written into an interconnected system consisting of $2q$ subsystems, with subsystem number $i$ for $i=1,\ldots,q$ given by
+% \begin{equation}
+%     \bar{\bm{M}}_i \dot{\bm{s}}_i + (\bm{\mu}_{i,i} + \bm{\delta}_{i,i}) \bm{s}_i + \bm{D}_i \bm{s}_i = \bm{0} ,
+% \end{equation}
+% and subsystem number $q+i$ for $i=1,\ldots,q$ given by
+% \begin{equation}
+%     \dot{\tilde{\bm{x}}}_i = -\bm{\Lambda}_i \tilde{\bm{x}}_i - \sum_{j=1}^{i-1} \bm{J}_i \bar{\bm{J}}_j^{M+} \bm{\Lambda}_j \tilde{\bm{x}}_j + \bm{s}_i + \sum_{j=1}^{i-1} \bm{J}_i \bar{\bm{J}}_j^{M+} \bm{s}_j.
+% \end{equation}
+% %
+% For each subsystem, take the following Lyapunov function candidates\todo[color=yellow!20]{Write dependency of $V_i$ on $\theta$?}:
+% \begin{subequations}
+%     \begin{align}
+%         \mathcal{V}_i(\bm{s}_i) &= \tfrac{1}{2} \bm{s}_i^\top\bar{\bm{M}}_i \bm{s}_i    &\textrm{for } i=1,\ldots,q,\\
+%         \mathcal{V}_{q+i} (\tilde{\bm{x}}_i ) &= \tfrac{1}{2} \Vert \tilde{\bm{x}}_i \Vert^2 &\textrm{for } i=1,\ldots,q .
+%     \end{align}
+% \end{subequations}
+% %
+% Differentiation of each gives
+% \begin{align}
+%     \begin{split}
+%         \dot{\mathcal{V}}_{i} ={}& \bm{s}_i^\top \left( - (\bm{\mu}_{i,i} + \bm{\delta}_{i,i}) \bm{s}_i - \bm{D}_i \bm{s}_i \right) + \tfrac{1}{2} \bm{s}_i^\top \dot{\bar{\bm{M}}}_i \bm{s}_i\\
+%     ={}& - \bm{s}_i^\top (\bm{\delta}_{i,i} + \bm{D}_i) \bm{s}_i  \leq - \lambda_{\min} (\bm{\delta}_{i,i} + \bm{D}_i) \Vert \bm{s}_i \Vert^2
+%     \end{split}\\
+%     \intertext{and}
+%     \begin{split}
+%         \dot{\mathcal{V}}_{q+i} ={}& - \tilde{\bm{x}}_i^\top  \bm{\Lambda}_i \tilde{\bm{x}}_i - \sum_{j=1}^{i-1} \tilde{\bm{x}}_i^\top \bm{J}_i \bar{\bm{J}}_j^{M+} \bm{\Lambda}_j \tilde{\bm{x}}_j + \tilde{\bm{x}}_i^\top \bm{s}_i + \sum_{j=1}^{i-1} \tilde{\bm{x}}_i^\top \bm{J}_i \bar{\bm{J}}_j^{M+} \bm{s}_j \\
+%         \leq{}& -\lambda_{\min}(\bm{\Lambda}_i) \Vert \tilde{\bm{x}}_i \Vert^2 + \sum_{j=1}^{i-1} \sigma_{\max}(\bm{J}_i \bar{\bm{J}}_j^{M+} ) \lambda_{\max} (\bm{\Lambda}_j)  \Vert \tilde{\bm{x}}_i \Vert\cdot \Vert \tilde{\bm{x}}_j \Vert\\
+%         &+ \Vert \tilde{\bm{x}}_i \Vert \cdot \Vert \bm{s}_i \Vert + \sum_{j=1}^{i-1} \sigma_{\max}(\bm{J}_i \bar{\bm{J}}_j^{M+} )  \Vert \tilde{\bm{x}}_i \Vert\cdot \Vert \bm{s}_j \Vert .
+%     \end{split}
+% \end{align}
+% %
+% Now let $\mathcal{V} = \sum_{i=1}^{2q} a^*_i \mathcal{V}_i$ where $a^*_i$, $i=1,\ldots,2q$ are positive constants. Then
+% \begin{equation}
+%     \dot{V} \leq -\tfrac{1}{2} \bm{\phi}_2^\top (\bm{A}_2 \bm{\Sigma}_2 + \bm{\Sigma}_2^\top \bm{A}_2 ) \bm{\phi}_2
+% \end{equation}
+% where $\bm{\phi}_2 = \left[ \Vert \bm{s}_1 \Vert,\, \ldots,\, \Vert \bm{s}_q \Vert,\, \Vert \tilde{\bm{x}}_1 \Vert,\, \ldots,\, \Vert \tilde{\bm{x}}_q \Vert   \right]^\top$, and $\bm{A}_2 \in \mathbb{R}^{2q\times 2q}$ is diagonal matrix with the coefficients $a^*_i$ along its diagonal. The matrix $\bm{\Sigma}_2 \in \mathbb{R}^{2q \times 2q}$ can be split into four $q \times q$ blocks, $\bm{\Sigma}_2 = \left[ \begin{smallmatrix}
+%     \bm{\Sigma}_{11} & \bm{\Sigma}_{12} \\ \bm{\Sigma}_{21} & \bm{\Sigma}_{22}
+% \end{smallmatrix}\right]$, with blocks
+% \begin{subequations}
+% \begin{align}
+%     \bm{\Sigma}_{11} &= \textrm{diag} (\lambda_{\min} (\bm{\delta}_{1,1} + \bm{D}_1),\ldots,\lambda_{\min} (\bm{\delta}_{q,q} + \bm{D}_q) )\\
+%     \bm{\Sigma}_{12} &= \bm{0}_{q\times q},\\
+%     \bm{\Sigma}_{21} &=
+%     \begin{bmatrix}
+%              -1 & 0 & \cdots & 0 \\
+%             -\sigma_{21}  & -1 & \cdots & 0 \\
+%             \vdots & \vdots & \ddots & \vdots \\
+%             -\sigma_{q1}  & -\sigma_{q2}  & \cdots & -1
+%          \end{bmatrix},\\
+%     \bm{\Sigma}_{22} &=
+%     \begin{bmatrix}
+%         \lambda_{\min}(\bm{\Lambda}_1) & 0 & \cdots & 0\\
+%          -\sigma_{21} \lambda_{\max} (\bm{\Lambda}_1)  & \lambda_{\min}(\bm{\Lambda}_2) & \cdots & 0\\
+%          \vdots & \vdots & \ddots & \vdots\\
+%          -\sigma_{q1} \lambda_{\max} (\bm{\Lambda}_1) & -\sigma_{q2} \lambda_{\max} (\bm{\Lambda}_2) & \cdots & \lambda_{\min}(\bm{\Lambda}_q)
+%     \end{bmatrix} .
+% \end{align}
+% \end{subequations}
+% where $\sigma_{ij} = \sigma_{\max}(\bm{J}_i \bar{\bm{J}}_j^{M+})$.
+% The matrix $\bm{\Sigma}_2$ is a lower triangular matrix with positive elements on the diagonal, and consequently all its leading principal minors are positive. Since all elements below the diagonal are non-positive, $\bm{\Sigma}_2$ is an M-matrix, and therefore by \cite[Lemma 9.7]{Khalil} there exist constants $a^*_i$, $i=1,\ldots,2q$ such that $(\bm{A}_2 \bm{\Sigma}_2 + \bm{\Sigma}_2^\top \bm{A}_2 )$ is a positive definite matrix.
+
+% Finally, since we can write
+% \begin{equation}
+%     \mathcal{V}(\bm{y}) = \tfrac{1}{2} \bm{y}^\top \left[ \begin{smallmatrix}
+%         a_1 \bm{I}_{m_1} & 0 & \cdots & 0 & 0 \\
+%         0 & a_1 \bar{\bm{M}}_1 & \cdots & 0 & 0 \\
+%         \vdots & & \ddots & & \vdots \\
+%         0 & 0 & \cdots & a_q \bm{I}_{m_q} & 0\\
+%         0 & 0 & \cdots & 0 & a_q \bar{\bm{M}}_q
+%         \end{smallmatrix} \right] \bm{y}
+% \end{equation}
+% and since $\Vert \bm{\phi}_2 \Vert = \Vert \bm{y} \Vert$, similarly as in the proof of \Cref{prop:comp:GES} it can be shown that $\mathcal{V}$ satisfies the conditions of~\cite[Theorem 4.10]{Khalil}, and thus the origin of the system~\eqref{eq:tasks:CL_Garofalo} is \gls{ges} if \Cref{ass:tasks:dof} is satisfied and there are no singularities. \hfill \qedsymbol
+
+%The choice of $\bm{z}$ in the controller leads to more top-down disturbances when rewriting the dynamics into the \textit{dynamically consistent} velocity variables $\bm{s}$, but makes it easier to look at the dynamics of each individual task in \textit{original} task variables.
+
+
+
+
+
+\section{Proposed controller and analysis}\label{sec:comp:robust}
+In this section, we address the scenario when the system is subject to bounded disturbances by augmenting the control input with an additional term designed to provide robustness against such bounded disturbances. While a similar robust controller was proposed by the authors in~\cite{Saeboe2022}, it lacked a formal proof of stability of the perturbed closed-loop system, leaving the completion of tasks unverified. In contrast, the new controller introduced here features a modified design, utilizing a sign-term in $\bm{s}_i$ instead of $\bm{z}_i$ to reduce top-down disturbances by the control input, and its stability properties are proved globally for the entire stack of tasks. This advancement establishes stronger guarantees for system performance under challenging conditions.
+
+%\todo[inline]{Write it wrong to write it right: The chocie of control law is similar as in~\cite{Saeboe2022} where a robust control law was also presented, but thanks to a slightly different choice of the additional term, stability can now be proved for the complete task hierarchy.}
+
+The proposed control law retains the overall decoupling structure of~\Cref{eq:tasks:tau_decoupling} but introduces an important modification compared to the control law in \eqref{eq:tasks:CL_task_i}: the task level control input is augmented with an additional term designed to improve the robustness of the controller:
+\begin{multline}\label{eq:comp:Fictrl_robust}
+    \bm{F}_{i,\textrm{ctrl}}^{\textrm{C}} = \bar{\bm{M}}_i \ddot{\bm{x}}_{i,r} + \left( \bm{\mu}_{i,i} + \bm{\delta}_{i,i} \right) \dot{\bm{x}}_{i,r} - \bm{K}_{D,i} \bm{z}_i - \bm{K}_{P,i} \tilde{\bm{x}}_i \\
+        - \bm{K}_{s,i} \textrm{sgn} (\bm{s}_i)
+        + \bm{\gamma}_i \begin{bmatrix} \dot{\bm{x}}^{\textrm{aug}}_{i-1,d} \\ \ddot{\bm{x}}^{\textrm{aug}}_{i-1,d}
+        \end{bmatrix}.
+\end{multline}
+
+Consider the system~\eqref{eq:tasks:v_dyn} with the decoupling control input~\eqref{eq:tasks:tau_decoupling}, resulting in the closed-loop task dynamics~\eqref{eq:tasks:vi_dot_interm}. In order to analyze the robustness of the proposed controller, suppose now that the system is subject to a bounded disturbance, which can be transformed into task coordinates so that each task $i$ is influenced by a bounded disturbance $\bm{f}_i(t,\bm{y}) \in \mathbb{R}^{m_i}$, where $\bm{y}_i = \left[ \tilde{\bm{x}}_i^\top \ \bm{s}_i^\top \right]^\top$. The task dynamics~\eqref{eq:tasks:vi_dot_interm} then become:
+\begin{equation}\label{eq:comp:vi_dot_interm_dist}
+    \bar{\bm{M}}_i \dot{\bm{v}}_i + \left( \bm{\mu}_{i,i} + \bm{\delta}_{i,i} \right) \bm{v}_i + \bm{f}_i(t,\bm{y})= \bm{F}_{i,\textrm{ctrl}} .
+\end{equation}
+%
+Let the $k$th element of $\bm{f}_i(t,\bm{y})$ be denoted $f_{ik}(t,\bm{y})$.
+\begin{assumption}\label{ass:comp:fi_bounded}
+    The disturbance is bounded, i.e., there exist positive constants $L_{ik}$ such that
+    \begin{equation}
+        | f_{ik}(t,\bm{y}) | \leq L_{ik}
+    \end{equation}
+    for $k=1,\ldots,m_i$, $i=1,\ldots,q$.
+\end{assumption}
+
+In the case when $\bar{\bm{J}}$ is invertible, the inverse matrix $\bm{G}^{-1} = \bm{J}^{\textrm{aug}} \bar{\bm{J}}^{-1}$ is given by~\cite{Garofalo2020} as
+\begin{equation} \label{G_inv}
+    \bm{G}^{-1} = \left[\begin{smallmatrix}
+        \bm{I}_{m_1} & \bm{0}_{m_1 \times m_2} & \cdots & \bm{0}_{m_1 \times m_q}\\
+        \bm{J}_2 \bar{\bm{J}}^{M+}_1 & \bm{I}_{m_2} & \cdots & \bm{0}_{m_2 \times m_q}\\
+        \vdots & \vdots & \ddots & \vdots \\
+        \bm{J}_q \bar{\bm{J}}^{M+}_1 & \bm{J}_q \bar{\bm{J}}^{M+}_2 & \cdots & \bm{I}_{m_q}
+    \end{smallmatrix} \right].
+\end{equation}
+Using \Cref{G_inv}, together with
+\Cref{eq:comp:gamma_expanded,eq:tasks:vGxdot,eq:tasks:s_v_xr},
+the task dynamics~\eqref{eq:comp:vi_dot_interm_dist} in closed loop with the control input~\eqref{eq:comp:Fictrl_robust} and transformed into the error variables $\bm{s}_i$ become
+ \begin{subequations}\label{eq:comp:CLtaski_robust}
+    \begin{align}
+        \dot{\tilde{\bm{x}}}_i &= -\bm{\Lambda}_i \tilde{\bm{x}}_i + \bm{s}_i + \sum_{j=1}^{i-1} \bm{J}_i \bar{\bm{J}}_j^{M+} ( \bm{s}_j - \bm{\Lambda}_j \tilde{\bm{x}}_j )\label{eq:comp:xitilde_dot_robust}\\
+            \bar{\bm{M}}_i \dot{\bm{s}}_i &+ (\bm{\mu}_{i,i} + \bm{\delta}_{i,i}) \bm{s}_i + \bm{K}_{D,i} \bm{s}_i
+            + \bm{K}_{D,i} \sum_{j=1}^{i-1} \bm{J}_i \bar{\bm{J}}_j^{M+} ( \bm{s}_j - \bm{\Lambda}_j \tilde{\bm{x}}_j ) \notag\\
+            &+ \bm{K}_{P,i} \tilde{\bm{x}}_i + \bm{K}_{s,i} \textrm{sgn} (\bm{s}_i) + \bm{f}_i(t,\bm{y}) = \bm{0} ,
+    \end{align}
+\end{subequations}
+%which is equivalent to~\eqref{eq:tasks:CL_Garofalo_xtildedot} for the whole vector $\tilde{\bm{x}}$.%
+and consequently
+\begin{multline}\label{eq:comp:s_dot_interm}
+    \bar{\bm{M}} \dot{\bm{s}} + (\bm{\mu}_{d} + \bm{\delta}_{d}) \bm{s} + \bm{K}_D \bm{s} - \bm{K}_D (\bm{G} - \bm{I} ) \dot{\tilde{\bm{x}}}  + \bm{K}_P \tilde{\bm{x}}\\
+    + \bm{K}_s \textrm{sgn}(\bm{s}) + \bm{f}(t,\bm{y})= \bm{0}
+\end{multline}
+where $\bm{\mu}_{d},\, \bm{\delta}_{d},\, \bm{K}_D,\, \bm{K}_P,\, \bm{K}_s$ are block-diagonal matrices with blocks of dimensions equal to the task dimensions, and $\bm{f}(t,\bm{y}) = \left[\bm{f}_1(t,\bm{y})^\top, \ldots, \bm{f}_q(t,\bm{y})^\top \right]^\top$. Finally, inserting~\eqref{eq:tasks:CL_Garofalo_xtildedot} in~\eqref{eq:comp:s_dot_interm}, the complete closed-loop dynamics are
+\begin{subequations}\label{eq:comp:CL}
+    \begin{align}
+        \dot{\tilde{\bm{x}}} &= - \bm{G}^{-1} \bm{\Lambda} \tilde{\bm{x}} + \bm{G}^{-1} \bm{s} \label{eq:comp:CL_xtildedot}\\
+        \begin{split}
+        \bar{\bm{M}} \dot{\bm{s}} &+ (\bm{\mu}_{d} + \bm{\delta}_{d}) \bm{s} + \bm{K}_D \bm{G}^{-1} \bm{s} + \bm{K}_D (\bm{I} - \bm{G}^{-1} )\bm{\Lambda} \tilde{\bm{x}}\\
+        &+ \bm{K}_P \tilde{\bm{x}} + \bm{K}_s \textrm{sgn}(\bm{s}) + \bm{f}(t,\bm{y}) = \bm{0} .
+        \label{eq:comp:CL_sdot}
+        \end{split}
+    \end{align}
+\end{subequations}
+
+\subsection{Stability Analysis}
+We are now ready to formulate the main result.
+\begin{theorem}
+    \label{prop:robust_stability}
+    Consider the closed-loop system \cref{eq:comp:CL} consisting of $q$ subsystems where the dynamics of subsystem $i$ ($i=1,\ldots,q$) are given by~\eqref{eq:comp:CLtaski_robust}. Let \Cref{ass:tasks:dof,ass:tasks:nonsingular,ass:comp:fi_bounded} be satisfied, and let the gain matrices $\bm{K}_{s,i}$ be chosen such that $K_{s,ik} \geq L_{ik}$ for all $k=1,\ldots,m_i$, $i=1,\ldots,q$. Then the origin of the system is \gls{es}, and if \Cref{ass:tasks:nonsingular} holds globally, the origin is \gls{ges}.
+\end{theorem}
+\todo[inline]{Could also prove that s=0 is finite time stable.}
+The validity of \Cref{ass:tasks:nonsingular} holding globally is discussed in \Cref{remark-singularities}
+% {\color{red}{Refer to \cref{remark-singularities} for a comment on \Cref{ass:tasks:nonsingular}.}}
+
+\begin{proof}
+For each subsystem, take the \gls{lfc}
+\begin{equation}\label{eq:comp:Vi}
+    V_i(\tilde{\bm{x}}_i,\bm{s}_i) = \tfrac{1}{2} \tilde{\bm{x}}_i^\top \bm{K}_{P,i} \tilde{\bm{x}}_i + \tfrac{1}{2} \bm{s}_i^\top\bar{\bm{M}}_i \bm{s}_i .
+\end{equation}
+Differentiation of $V_i$ along the trajectories of the system~\eqref{eq:comp:CLtaski_robust} gives
+    \begin{multline} \label{eq:comp:Vidot_robust}
+        \dot{V}_i = - \tilde{\bm{x}}_i^\top  \bm{K}_{P,i} \bm{\Lambda}_i \tilde{\bm{x}}_i - \bm{s}_i^\top( \bm{\delta}_{i,i} + \bm{K}_{D,i}) \bm{s}_i \\
+         \hspace{-1em} - \bm{s}_i^\top \left( \bm{K}_{s,i} \textrm{sgn} (\bm{s}_i) + \bm{f}_i(t,\bm{y}) \right) + \left[ \tilde{\bm{x}}_i^\top \ \bm{s}_i^\top \right]
+        \begin{bmatrix}
+            \bm{K}_{P,i} & \bm{0} \\ \bm{0} & \bm{K}_{D,i}
+        \end{bmatrix}
+        \begin{bmatrix}
+            \bm{I}_{m_i} \\ -\bm{I}_{m_i}
+        \end{bmatrix} \\
+        \cdot
+        \sum_{j=1}^{i-1}
+            \bm{J}_i \bar{\bm{J}}_j^{M+}
+        \begin{bmatrix}
+            -\bm{I}_{m_j} & \bm{I}_{m_j}
+        \end{bmatrix}
+        \begin{bmatrix}
+            \bm{\Lambda}_j & \bm{0} \\ \bm{0} & \bm{I}_{m_j}
+        \end{bmatrix}
+        \begin{bmatrix}
+            \tilde{\bm{x}}_j \\ \bm{s}_j
+        \end{bmatrix}
+    \end{multline}
+using \Cref{eq:comp:CLtaski_robust} and the fact that $\dot{\bar{\bm{M}}}_i-2\bm{\mu}_{i,i}$ is skew-symmetric. The cross-terms due to the top-down disturbance from other tasks can be bounded by the product of the norms of each matrix and vector in the term, arriving at
+\begin{equation}\label{eq:Vi_dot_bound}
+    \begin{split}
+    \dot{V}_i \leq{}& -\alpha_i \Vert \bm{y}_i \Vert + \sum_{j=1}^{i-1} \beta_{ij} \Vert \bm{y}_i \Vert \cdot \Vert \bm{y}_j \Vert \\
+    & \quad - \sum_{k=1}^{m_i} |s_{ik}| \left( K_{s,ik} - |f_{ik}(t,\bm{y})| \right)
+    \end{split}
+\end{equation}
+where
+\begin{subequations}\label{eq:comp:alphabeta}
+    \begin{align}
+        \alpha_i ={}& \min \left( \lambda_{\min}(\bm{K}_{P,i} \bm{\Lambda}_i), \lambda_{\min}(\bm{\delta}_{i,i} + \bm{K}_{D,i})\right),\\
+        \begin{split}
+            \beta_{ij} ={}& 2 \max \left( \lambda_{\max}(\bm{K}_{P,i} ), \lambda_{\max}(\bm{K}_{D,i})\right)\cdot \sigma_{\max}( \bm{J}_i \bar{\bm{J}}_j^{M+} ) \\
+            &\cdot \max \left( \lambda_{\max}(\bm{\Lambda}_j),1\right).
+        \end{split}
+    \end{align}
+\end{subequations}
+Choosing $V(\bm{y}) = \sum_{i=1}^{q} a_i V_i(\bm{y}_i)$ as a \gls{lfc} for \cref{eq:comp:CL}, where $a_i$ are positive constants for $i=1,\ldots,q$, we now obtain
+\begin{multline}
+    \label{eq:comp:Vdot_bound}
+    \dot{V} \leq -\tfrac{1}{2} \bm{\phi}^\top (\bm{A} \bm{\Sigma} + \bm{\Sigma}^\top \bm{A} ) \bm{\phi} \\
+    - \sum_{i=1}^{q} \sum_{k=1}^{m_i} a_i  |s_{ik}| \left( K_{s,ik} - |f_{ik}(t,\bm{y})| \right)
+\end{multline}
+where $\bm{\phi} = \left[ \Vert \bm{y}_1 \Vert,\, \ldots,\, \Vert \bm{y}_q \Vert   \right]^\top$, and $\bm{A} \in \mathbb{R}^{q\times q}$ is a diagonal matrix with the coefficients $a_i$ along its diagonal. The matrix $\bm{\Sigma} \in \mathbb{R}^{q\times q}$ is given by
+\begin{equation}\label{eq:comp:S}
+    \bm{\Sigma} = \left[ \begin{smallmatrix}
+        \alpha_1 & 0 & \cdots & 0\\
+        -\beta_{21} & \alpha_2 & \cdots & 0\\
+        \vdots & \vdots & \ddots & \vdots\\
+        -\beta_{q1} & -\beta_{q2} & \cdots & \alpha_q
+        \end{smallmatrix} \right].
+\end{equation}
+
+    % By \cite[Lemma 9.7]{Khalil}, there exist constants $a_i$ such that the matrix $\bm{A} \bm{\Sigma} + \bm{\Sigma}^\top \bm{A}$ is positive definite if and only if $\bm{\Sigma}$ is a nonsingular M-matrix, i.e.~all its off-diagonal elements are nonpositive and all leading principal minors are strictly positive. Since $\bm{\Sigma}$ is a lower-triangular matrix with strictly positive elements on the diagonal and non-positive elements below it, it is an M-matrix.
+
+    By \cite[Lemma 9.7]{Khalil}, there exist constants $a_i$ such that the matrix $\bm{A} \bm{\Sigma} + \bm{\Sigma}^\top \bm{A}$ is positive definite iff $\bm{\Sigma}$ is a nonsingular M-matrix, i.e.~all its off-diagonal elements are nonpositive and all leading principal minors are strictly positive. Since $\bm{\Sigma}$ is a lower-triangular matrix with strictly positive elements on the diagonal and non-positive elements below it, it is an M-matrix.
+
+
+    % Then by \cite[Theorem 9.2]{Khalil}, the origin of the system~\eqref{eq:comp:CL} is \gls{uas}, and \gls{ugas} if \Cref{ass:tasks:nonsingular} holds globally. At the origin, from~\eqref{eq:comp:CL_xtildedot} it follows that $\dot{\tilde{\bm{x}}} = 0$, and consequently from~\eqref{eq:comp:si} it follows that $\bm{z} = 0$, i.e.~that the origin in $(\tilde{\bm{x}},\bm{s})$- and $(\tilde{\bm{x}},\bm{z})$-coordinates coincides. Thus the origin of~\eqref{eq:tasks:CL_task_i} is \gls{ugas} if there are no singularities.
+
+    To prove exponential stability, we rewrite $V$ as
+    \begin{equation}
+        V(\bm{y}) = \tfrac{1}{2} \bm{y}^\top \underbrace{\left[ \begin{smallmatrix}
+        a_1 \bm{K}_{P,1} & 0 & \cdots & 0 & 0 \\
+        0 & a_1 \bar{\bm{M}}_1 & \cdots & 0 & 0 \\
+        \vdots & & \ddots & & \vdots \\
+        0 & 0 & \cdots & a_q \bm{K}_{P,q} & 0\\
+        0 & 0 & \cdots & 0 & a_q \bar{\bm{M}}_q
+        \end{smallmatrix} \right]}_{=\bm{P}} \bm{y} ,
+    \end{equation}
+    and since $\bm{K}_{P,i}$, $\bar{\bm{M}}_i$ are positive definite matrices for all $i=1,\ldots,q$, we can choose $k_1 = \frac{1}{2} \lambda_{\min}(\bm{P}) > 0$ and $k_2 = \frac{1}{2} \lambda_{\max}(\bm{P})$ s.t.
+    \begin{equation}\label{eq:comp:Vbounds}
+        k_1 \Vert \bm{y} \Vert^2 \leq V \leq k_2 \Vert \bm{y} \Vert^2 .
+    \end{equation}
+
+    For $K_{s,ik} \geq |f_{ik}(t,\bm{y})|$ and from~\eqref{eq:comp:Vbounds}, it follows that
+    \begin{equation} \label{V_dot_ES}
+        \begin{split}
+            \dot{V} &\leq -\tfrac{1}{2} \bm{\phi}^\top (\bm{A} \bm{\Sigma} + \bm{\Sigma}^\top \bm{A} ) \bm{\phi} \leq -\tfrac{1}{2} \lambda_{\min}(\bm{A} \bm{\Sigma} + \bm{\Sigma}^\top \bm{A} ) \Vert \bm{y} \Vert^2\\
+            &\leq - \frac{\lambda_{\min}(\bm{A} \bm{\Sigma} + \bm{\Sigma}^\top \bm{A} )}{\lambda_{\max}(\bm{P})} V.
+        \end{split}
+    \end{equation}
+    Since $\bm{\Sigma}$ is a nonsingular M-matrix, there exists a choice of $\bm{A}$ such that $\bm{A} \bm{\Sigma} + \bm{\Sigma}^\top \bm{A}$ is a positive definite matrix, and consequently $k_3 = \frac{\lambda_{\min}(\bm{A} \bm{\Sigma} + \bm{\Sigma}^\top \bm{A} )}{\lambda_{\max}(\bm{P})} > 0$. Then by the comparison lemma~\cite[Lemma 3.4]{Khalil},
+    \begin{equation}
+        V(\bm{y}(t)) \leq V(\bm{y}(t_0)) e^{-k_3(t-t_0)}
+    \end{equation}
+    and as a consequence of~\eqref{eq:comp:Vbounds},
+    \begin{equation}
+        \Vert \bm{y}(t) \Vert \leq \sqrt{\tfrac{k_2}{k_1}} \Vert \bm{y}(t_0) \Vert e^{-\frac{k_3}{2}(t-t_0)}
+    \end{equation}
+    meaning that the origin is \gls{es}.
+    If \Cref{ass:tasks:nonsingular} holds globally, the bound in~\Cref{V_dot_ES} also holds globally, and the origin is \gls{ges}.
+\end{proof}
+
+In the case with no external disturbance, the same analysis holds for the non-robust controller given by \Cref{eq:tasks:tau_decoupling}, \Cref{eq:tasks:Fictrl}, giving global exponential stability results for the entire stack of tasks, which could not be shown in \cite{Saeboe2022}.
+\begin{corollary}\label{corollary:comp:GES}
+    % same assumptions as in Theorem 1
+    % Let \Cref{ass:tasks:dof,ass:tasks:nonsingular} be satisfied.
+   Consider the closed-loop system consisting of $q$ subsystems where the dynamics of subsystem $i$ ($i=1,\ldots,q$) are given by~\eqref{eq:tasks:CL_task_i}. Let \Cref{ass:tasks:dof,ass:tasks:nonsingular} be satisfied.
+    Then the origin of the system is \gls{es}. Furthermore, if \Cref{ass:tasks:nonsingular} holds globally, the origin is \gls{ges}.
+\end{corollary}
+
+\begin{proof}
+    The proof follows the same structure as \Cref{prop:robust_stability}, but with no external disturbance term and no sign-term in the controller ($\bm{K}_{s,i} \equiv \bm{0}, \bm{f}_i \equiv \bm{0}, \ \forall i $).
+\end{proof}
+
+    % Again, the system~\eqref{eq:comp:CL} can be written into an interconnected system consisting of $q$ subsystems, corresponding to each task, with subsystem number $i$ for $i=1,\ldots,q$ given by
+    % \begin{subequations} \label{interconnection}
+    %     \begin{equation}
+    %         \dot{\tilde{\bm{x}}}_i = -\bm{\Lambda}_i \tilde{\bm{x}}_i + \bm{s}_i + \sum_{j=1}^{i-1} \bm{J}_i \bar{\bm{J}}_j^{M+} \left( \bm{s}_j - \bm{\Lambda}_j \tilde{\bm{x}}_j \right) \label{eq:comp:xitilde_dot}
+    %     \end{equation}
+    %     \begin{multline}
+    %         \bar{\bm{M}}_i \dot{\bm{s}}_i + (\bm{\mu}_{i,i} + \bm{\delta}_{i,i}) \bm{s}_i + \bm{K}_{D,i} \bm{s}_i
+    %         + \bm{K}_{P,i} \tilde{\bm{x}}_i \\
+    %         + \bm{K}_{D,i} \sum_{j=1}^{i-1} \bm{J}_i \bar{\bm{J}}_j^{M+} \left( \bm{s}_j - \bm{\Lambda}_j \tilde{\bm{x}}_j \right) = \bm{0} .
+    %     \end{multline}
+    % \end{subequations}
+    % %
+    % The same task level Lyapunov function candidate from \Cref{eq:comp:Vi} is used, {$V_i(\tilde{\bm{x}}_i,\bm{s}_i) = \tfrac{1}{2} \tilde{\bm{x}}_i^\top \bm{K}_{P,i} \tilde{\bm{x}}_i + \tfrac{1}{2} \bm{s}_i^\top\bar{\bm{M}}_i \bm{s}_i$}, giving
+    % \begin{equation}
+    %     \dot{V} \leq -\tfrac{1}{2} \bm{\phi}^\top (\bm{A} \bm{\Sigma} + \bm{\Sigma}^\top \bm{A} ) \bm{\phi}
+    % \end{equation}
+    % with $\bm{\phi} , \bm{A} $, and $\bm{\Sigma}\in \mathbb{R}^{q\times q}$ as in \Cref{eq:comp:Vdot_bound}.
+    % %
+    % Since $\bm{K}_{P,i}$, $\bar{\bm{M}}_i$ are positive definite matrices for all $i=1,\ldots,q$, we can choose $k_1 = \frac{1}{2} \lambda_{\min}(\bm{P}) > 0$ and $k_2 = \frac{1}{2} \lambda_{\max}(\bm{P})$ s.t.
+
+    % \begin{equation}
+    %     k_1 \Vert \bm{y} \Vert^2 \leq V \leq k_2 \Vert \bm{y} \Vert^2 .
+    % \end{equation}
+    % Since $\bm{\Sigma}$ is a nonsingular M-matrix, we can bound $\dot{V}$ by
+    % \begin{equation}
+    %     \dot{V} \leq -\tfrac{1}{2} \bm{\phi}^\top (\bm{A} \bm{\Sigma} + \bm{\Sigma}^\top \bm{A} ) \bm{\phi} \leq - \tfrac{1}{2} \lambda_{\min}(\bm{A} \bm{\Sigma} + \bm{\Sigma}^\top \bm{A}) \Vert \bm{\phi} \Vert^2
+    % \end{equation}
+    % where $\lambda_{\min}(\bm{A} \bm{\Sigma} + \bm{\Sigma}^\top \bm{A}) > 0$.
+    % Finally, by noting that
+    % \begin{equation}
+    %     \Vert \bm{\phi} \Vert^2 = \sum_{i=1}^{q} \Vert \bm{y}_i \Vert^2
+    %     = \sum_{i=1}^{q} \sum_{j=1}^{m_i} y_{i,j}^2 = \Vert \bm{y} \Vert^2
+    % \end{equation}
+    % where $y_{i,j}$ denotes the $j$th element of $\bm{y}_i$, we can conclude that $V$ satisfies the conditions of~\cite[Theorem 4.10]{Khalil}. Thus the origin is \gls{es}, and \gls{ges} if there are no singularities.
+
+
+\begin{remark}
+    \label{remark-singularities}
+    The assumption that $\bm{J}^{\textrm{aug}}$ is invertible in the relevant part of the state-space is common in the literature \cite{antonelli2009,Dietrich2020,Wu2022}, but restricts the choice of task combinations. In practice, choosing tasks which satisfy this assumption can be difficult and requires good planning, which is outside the scope of this paper.
+    However, the property of ``global stability in the absence of singularities" indicates that convergence can be achieved for any magnitude of initial errors, so long as no singularities are encountered. This could not be concluded in~\cite{Saeboe2022} or for the tracking controller in~\cite{Dietrich2020}, where theorems giving local stability properties were applied.
+\end{remark}
+
+\subsection{Comparison with existing control methods}
+
+As mentioned, the proposed robust controller~\eqref{eq:comp:Fictrl_robust} is very similar to the robust controllers proposed in \cite{Saeboe2022,DyrhaugTveter2023}, given by \Cref{eq:tasks:tau_decoupling,eq:tasks:Fictrl,eq:comp:Fictrl_SM}. All these controllers can be written on the same form, with the decoupling torque level control input \Cref{eq:tasks:tau_decoupling} and a task level control force on the form
+\begin{equation}
+    \bm{F}_{i,{\rm ctrl}} = \bm{F}_{i, {\rm ff}} + \bm{F}_{i, {\rm comp}},
+\end{equation}
+where $\bm{F}_{i, {\rm ff}} = \bar{\bm{M}}_i \ddot{\bm{x}}_{i,r} + \left( \bm{\mu}_{i,i} + \bm{\delta}_{i,i} \right) \dot{\bm{x}}_{i,r} + \bm{\gamma}_i
+    \begin{bmatrix} \dot{\bm{x}}^{\textrm{aug}}_{i-1,d} \\ \ddot{\bm{x}}^{\textrm{aug}}_{i-1,d}
+    \end{bmatrix}$
+is a feedforward term and $\bm{F}_{i, {\rm comp}}$ differs between the control approaches. For readability, they are summarized in \Cref{tab:comp:ctrls}.
+\begin{table}[htb]
+    % Add more vertical space to tilde doestnt crash with hline
+    \renewcommand{\arraystretch}{1.2}
+    \caption{Compared control approaches}
+    \begin{center}\label{tab:comp:ctrls}
+        % \small
+        \begin{tabular}{c|c|l}
+            &Controller & $\bm{F}_{i,{\rm comp}}$ \\
+            \hline
+            A& Compliant \cite{Saeboe2022} &
+            $- \bm{K}_{D,i} \bm{z}_i - \bm{K}_{P,i} \tilde{\bm{x}}_i$\\
+            \hline
+            B& Previous robust \cite{DyrhaugTveter2023} & $- \bm{K}_{D,i} \bm{s}_i - \bm{K}_{s,i} \textrm{sgn} (\bm{s}_i)$ \\
+            \hline
+            C & Proposed (\Cref{sec:comp:robust}) &
+            $- \bm{K}_{D,i} \bm{z}_i  -\bm{K}_{P,i} \tilde{\bm{x}}_i - \bm{K}_{s,i} \textrm{sgn} (\bm{s}_i)$\\
+            \hline
+            D& Robust backstepping \cite{Saeboe2022} &
+            $- \bm{K}_{D,i} \bm{z}_i - \bm{K}_{P,i} \tilde{\bm{x}}_i - \bm{K}_{s,i} \textrm{sgn} (\bm{z}_i)$\\
+            \hline
+            E&  Decoupled compliant \cite{Garofalo2020} &
+            $- \bm{K}_{D,i} \bm{s}_i $\\
+            \hline
+        \end{tabular}
+    \end{center}
+\end{table}
+
+As we can see, the different approaches appear quite similar, but with some distinct differences. The most obvious distinction is perhaps the inclusion of a sign-term in the robust controllers B, C and D. These prioritize exact tracking, compared to the compliant behavior of the non-robust methods. In some cases, the passivity-motivated impedance behavior exhibited by the continuous compliant controller might be preferable, at the expense of lower tracking accuracy. However, using the proposed robust method, disturbances with magnitudes below $\bm{K}_{s,i}$ will be fully rejected, while larger forces will elicit impedance behavior. This enables selective attenuation of disturbances, while allowing impedance behavior in response to larger forces through appropriate tuning of $\bm{K}_{s,i}$.
+
+% Robust control using sliding mode or similar methods where disturbances are dominated by the control input can be combined with a compliant behavior by measuring the force at e.g.~the end-effector and modifying the references for the corresponding task accordingly, such as in e.g.~\cite{Dyrhaug2024MECC}
+
+Compared with controller B from \cite{DyrhaugTveter2023}, the proposed controller includes the damping term $\bm{K}_{D,i} \bm{z}_i$, in place of $\bm{K}_{D,i} \bm{s}_i$, prioritizing convergence of the error $\bm{z}_i$ for the true task velocities over the error $\bm{s}_i$ for the dynamically consistent velocities. It also includes an extra proportional $\bm{K}_{P,i} \tilde{\bm{x}}_i$ term to improve the transient behavior of lower-priority tasks. We refer to controller D as a backstepping controller due to the $\bm{z}_i$-variables' similarity to a virtual backstepping control input. Compared with the robust backstepping controller, the sign-term of the proposed controller is computed based on the decoupled task velocities, $\bm{s}_i$. Since the dynamics of the variables $\bm{z}_i$ depend on the acceleration of higher-priority tasks, applying the sign-term directly on the $\bm{z}_i$ causes the discontinuous control input to act as a disturbance on lower-priority tasks, thus causing a buildup of chattering effects. The proposed approach avoids this issue by using the discontinuous term only in the dynamically decoupled velocities.
+
+% By using the expression~\eqref{eq:comp:gamma_expanded} and performing the coordinate change~\eqref{eq:comp:si}, we see that the control laws proposed by~\cite{Garofalo2020} and \cite{Saeboe2022} in fact give very similar closed-loop dynamics of the system. The two control laws differ by the choice of error variable for the damping term, and the addition of the extra proportional $\bm{K}_{P,i} \tilde{\bm{x}}_i$ term in~\cite{Saeboe2022}. This can improve the transient behavior of lower-priority tasks.
+
+\todo[inline]{Compared to e.g.~the first-order sliding mode controller from~\cite{DyrhaugTveter2023}, the proposed controller includes a damping term in the task velocity error variable $z$, rather than the dynamically consistent task velocity error variable $s$. This can contribute to better performance during the transient phase for the lower-priority tasks. (And should in fact be possible to see in simulations)}
+
+\todo[inline]{Based on one simulation example: With large values of the damping matrix, the "robust backstepping controller" appears to still give better transient behaviour of lower-priority tasks, and no more chattering than first-order SM (e.g. towards the edge of the workspace, when feasibility of tasks begins to be a bit questionable)}
+
+
+\todo[inline]{Some thoughts for possible discussion: the robust controller is still prone to some chattering-like effects, so for both robustness and smoother control input it's probably better to use HOSM to achieve FTS for $s$.}
+
+\todo[inline,color=yellow!20]{Write a remark saying that we can prove GES along the same lines for the SMC, so that they are equivalent again}
+
+
+\section{Simulation results}\label{sec:comp:simulation}
+This section presents simulations in which the proposed robust controller is compared with its continuous precursor, and a previous robust controller with similar properties.
+To isolate and emphasize the differences in convergence behavior and transient responses among the control strategies without the added complexity introduced by vehicle-manipulator systems, the simulations are performed on a model of a fixed-base manipulator, a 7 \gls{dof} Franka Emika Panda robot. The simulation model is based on the dynamic model identified in~\cite{Gaz2019}, and implemented in MATLAB Simulink.
+
+Three tasks are given. As task~1, the end-effector is to follow a trajectory tracing out a lemniscate, shown in \Cref{fig:comp:EEref}. Task 2 is to hold the orientation of the end-effector fixed at the constant reference $\bm{x}_{2,d} = [\pi,\, 0,\, 0]^\top$ for roll, pitch and yaw angles. Finally, task 3 is to control the first joint to the constant reference $x_{3,d} = 0$. The task dimensions are $m_1 = m_2 = 3$ and $m_3 = 1$. The initial robot configuration, its end-effector frame and desired end-effector trajectory are shown in \Cref{fig:comp:initconfig}. The initial joint configuration is ${\bm{\theta}_0 = \left[\frac{\pi}{4},\, -\frac{\pi}{3},\, 0,\, -\frac{2\pi}{3},\, 0,\, \frac{\pi}{3},\, \frac{\pi}{6}\right]^\top}$, and the control parameters are given in \Cref{tab:comp:gains}. %The control torques to the joints are saturated to avoid infeasible control inputs, with limits $\pm 85$ Nm for joints 1-4 and $\pm 12$ Nm for joints 5-7\todo{Refer to interface github as source?}.
+
+% \begin{figure}[htb]
+% 		\centering
+% 		\includegraphics[width=0.3\textwidth,trim={2cm 1cm 1cm 2cm},clip]{fig/init_config}
+% 	\caption{The initial configuration and the path traced by the desired end-effector trajectory. The end-effector frame is shown with $x$-, $y$- and $z$-axis in red, green and blue, respectively.}
+%     \label{fig:comp:initconfig}
+% \end{figure}
+
+\begin{figure}[htb]
+		\centering
+		\includegraphics[width=0.75\linewidth]{figures/CCTA25/setup2.eps}
+	\caption{The initial configuration and the path traced by the desired end-effector trajectory. The end-effector frame is shown with $x$-, $y$- and $z$-axis in red, green and blue, respectively. The semi-transparent axes show the desired orientation.}
+    \label{fig:comp:initconfig}
+\end{figure}
+
+\begin{figure}[htb]
+	\centering
+	% \includegraphics[width=0.3\textwidth,trim={0cm 0cm 1cm 1cm},clip]{fig/EEreference.png}
+    \includegraphics[width=0.8\linewidth]{figures/CCTA25/end_effector_traj.eps}
+\caption{End-effector reference trajectory}\label{fig:comp:EEref}
+\end{figure}
+\begin{table}[htb]
+    \renewcommand{\arraystretch}{1.2}
+    \caption{Controller gains}
+    \begin{center}\label{tab:comp:gains}
+        \small
+        \begin{tabular}{l | c  c  c  c}
+            Task~\# & $\bm{\Lambda}_i$ & $\bm{K}_{D,i}$ & $\bm{K}_{P,i}$ & $\bm{K}_{s,i}$ \\
+            \hline
+            $i=1$ & $5 \bm{I}_3$ & $15 \bm{I}_3$ & $10 \bm{I}_3$ & $5 \bm{I}_3$\\
+            \hline
+            $i=2$ & $5 \bm{I}_3$ & $10 \bm{I}_3 $ & $5 \bm{I}_3$ & $0.5\bm{I}_3$\\[2pt]
+            \hline
+            $i=3$ & 5 & 10 & 5 &  0.5\\[2pt]
+            \hline
+        \end{tabular}
+    \end{center}
+\end{table}
+
+% \begin{table}[htb]
+%     \caption{Compared control approaches}
+%     \begin{center}\label{tab:comp:ctrls}
+%         \small
+%         \begin{tabular}{l | c | c}
+%             Controller & Source & Control law \\[2pt]
+%             \hline
+%             Proposed controller & \Cref{sec:comp:robust}  & \Cref{eq:tasks:tau_decoupling}, \Cref{eq:comp:Fictrl_robust}\\[2pt]
+%             \hline
+%             Previous robust controller & \cite{DyrhaugTveter2023} & \Cref{eq:tasks:tau_decoupling}, \Cref{eq:comp:tau_SM} \\[2pt]
+%             \hline
+%             Impedance controller & \Cref{sec:comp:robust}  & \Cref{eq:tasks:tau_decoupling}, \Cref{eq:tasks:Fictrl}\\[2pt]
+%             \hline
+%         \end{tabular}
+%     \end{center}
+% \end{table}
+
+The proposed controller~\eqref{eq:tasks:tau_decoupling},~\eqref{eq:comp:Fictrl_robust} from this paper is compared against two other controllers: the continuous compliance controller from \cite{Saeboe2022}, i.e., \eqref{eq:tasks:tau_decoupling}, \eqref{eq:tasks:Fictrl}, and the previous robust approach from~\cite{DyrhaugTveter2023}, i.e., \Cref{eq:tasks:tau_decoupling}, \Cref{eq:comp:Fictrl_SM}. These are denoted as controllers C, A, and B, respectively, in \cref{tab:comp:ctrls}.
+
+A constant disturbance force of \qty{4}{\newton} in the positive $y$-direction acts on the end-effector from time \qty[parse-numbers=false]{t=30}{\second} to $t=40$\,\si{\second}, as indicated by the gray shading in the plots.
+The tracking errors are shown in \Cref{fig:task_error_controller1_cont,fig:task_error_controller2_robust,fig:task_error_controller3_SM}. The joint angles and torques are shown in \Cref{fig:joint_angles,fig:joint_torques} for all three controllers. Note that the plots of the task errors are divided in two parts with different scale on the $y$-axis to display both the transient and the steady-state response.
+
+The magnitude of the disturbance is smaller than the elements of the gain matrix $\bm{K}_{s,1}$ in accordance with \Cref{ass:comp:fi_bounded}, meaning that the proposed robust controller with the chosen gains is expected to counteract the disturbance. \Cref{fig:task_error_controller2_robust} shows that it does indeed successfully counteract the disturbance, and the tracking error in task~1 caused by the disturbance is smaller than \qty{0.5}{\milli\meter}. The previous robust controller performs equally well for the first task, as can be seen in \Cref{fig:task_error_controller3_SM}. The compliant controller, however, is unable to fully counteract the disturbance, resulting in an offset of about \qty{4.5}{\centi\meter} from the desired trajectory while the disturbance is present, as can be seen in \Cref{fig:task_error_controller1_cont}. In addition, \Cref{fig:task_error_controller1_cont,fig:task_error_controller2_robust,fig:task_error_controller3_SM} show that for all controllers the change in disturbance acting in the task space of task~1 disturbs the lower-priority tasks as well, as expected for hierarchical task-priority controllers.
+
+Looking at the transients of the lower-priority tasks  when using the proposed robust controller and the previous robust controller, especially for task~2 it can be seen from \Cref{fig:task_error_controller2_robust,fig:task_error_controller3_SM} that the proposed robust controller gives smaller overshoots and faster convergence than the previous robust controller. \Cref{fig:joint_angles,fig:joint_torques} show that both the joint angles and the torques are within the limits of what is feasible for the manipulator\footnote{For details, see the Franka Control Interface (FCI) -- Robot and interface specifications: }
+
+%\url{https://frankaemika.github.io/docs/control_parameters.html}}, 
+
+except for an initial spike of about $60\,$Nm, which would have to be saturated if doing physical experiments. In \Cref{fig:joint_torques}, it can be seen that the robust controllers gives very high-frequency oscillations, called chattering, which is a common problem in high-gain control. To alleviate chattering, one can for example use a continuous approximation of the signum term, which was also considered in~\cite{DyrhaugTveter2023}.
+
+% Chattering in the control input is undesirable, as it causes more wear of the actuators, and it may not be possible for real-life actuators to realize it exactly. Chattering can be reduced by using a continuous approximation of the signum term, for example a slope, which was also considered in~\cite{DyrhaugTveter2023}. Another option is to use higher-order sliding mode control methods, in which the signum term is integrated to give a continuous control input~\cite{Shtessel2014}. However, while the choice of damping term in $\bm{z}$ improved the performance of lower-priority tasks, it introduces top-down disturbances into the dynamics of $\bm{s}_i$~\eqref{eq:comp:CL_sdot}, which may complicate the incorporation and analysis of higher-order sliding mode control.
+
+\begin{figure}
+    \centering
+    \includegraphics[width=\linewidth]{figures/CCTA25/case2_controller1_cont_task_errors.eps}
+    \caption{Task errors with controller A (compliant)}
+    \label{fig:task_error_controller1_cont}
+\end{figure}
+
+\begin{figure}
+    \centering
+    \includegraphics[width=\linewidth]{figures/CCTA25/case2_controller3_SM_task_errors.eps}
+    \caption{Task errors with controller B (previous robust)}
+    \label{fig:task_error_controller3_SM}
+\end{figure}
+
+\begin{figure}
+    \centering
+    \includegraphics[width=\linewidth]{figures/CCTA25/case2_controller2_robust_task_errors.eps}
+    \caption{Task errors with controller C (proposed robust)}
+    \label{fig:task_error_controller2_robust}
+\end{figure}
+
+\begin{figure}
+    \centering
+    \includegraphics[width=0.98\linewidth]{figures/CCTA25/torques.eps}
+    \caption{Joint torques for controller A (top plot), controller B (middle plot), and controller C (bottom plot).}
+    \label{fig:joint_torques}
+\end{figure}
+\begin{figure}
+    \centering
+    \includegraphics[width=0.98\linewidth]{figures/CCTA25/joint_angles.eps}
+    \caption{Joint angles for controller A (solid line), controller B (dotted line), and controller C (dashed line).}
+    \label{fig:joint_angles}
+\end{figure}
+
+
+
+\section{Conclusions and Future Work}\label{sec:comp:summary}
+
+This paper analyzed the stability properties of two existing tracking control laws for robot manipulators and \glspl{vms} performing multiple prioritized tasks. Stronger stability properties were established for these control laws, improving upon previous results. Moreover, a new, robust tracking control law was proposed and shown to achieve exponential stability of all task tracking errors and global exponential stability in the absence of singularities. 
+
+The performance of the proposed control law was investigated and compared against similar existing control laws through simulations. The simulation results show that the proposed control law exhibits comparable robustness to a previously proposed robust control law while offering improved convergence behavior for lower-priority tasks. This suggests that using the original task velocities in the damping term can enhance the transient performance of lower-priority tasks.
+
+Future work will focus on further comparing and validating the proposed method through additional simulations involving physical interaction scenarios, as well as experiments with both fixed-base manipulators and \gls{vms}. The possibility of utilizing a higher-order sliding mode control approach will be explored as a means to maintain the desirable robustness properties while mitigating chattering effects. Another promising direction is combining the robustness with impedance behavior through measurements of interaction forces.
+
+
+\ifSubfilesClassLoaded{%
+  \bibliographystyle{\chosenbibstyle}
+  \bibliography{\bibfilename}
+}{}
+
+\end{document}

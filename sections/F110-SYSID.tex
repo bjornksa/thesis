@@ -1,0 +1,581 @@
+\documentclass[../main.tex]{subfiles}
+\begin{document}
+
+\chapter{A data-driven control-oriented dynamic model of a tendon-actuated continuum robot}
+Developing dynamic models for continuum robots is challenging due to their nonlinear and high-dimensional nature. This paper presents a comparative study of several data-driven system identification methods—including SINDYc—for modeling a tendon-actuated continuum robot with rolling joints developed at CERN. Despite the high number of joints of the robot, a two-degree-of-freedom dynamic model is shown to accurately capture the system dynamics, owing to kinematic dependencies between the joints in normal operation. The models are validated against experimental data, and used in the design of a model predictive controller, demonstrating their feasibility for real-time control.
+
+%we develop a (novel?) 2-Degree-of-Freedom (2-DoF) data-driven dynamic model of a tendon-actuated continuum robot with rolling joints. Despite the high number of joints, kinematic dependencies between the joints allow accurate simulations of the system using a computationally simpler 2-DoF model, having only the two first joint angles as output. The remaining joint angles are estimated using a constant-ratio curvature approach based on experimental results of measured joint angles. The model is validated against real data through experiments.
+
+\section{Introduction}
+
+\begin{figure}
+\centerline{\includegraphics[width=\linewidth]{figures/IFAC26/snake.png}}
+\caption{Tendon-actuated snake robot with rolling joints.}
+\label{fig:snake}
+\end{figure}
+
+The European Organization for Nuclear Research (CERN), with its underground accelerator complex spanning several tens of kilometers, facilitates collisions of particles close to the speed of light. The high energy of the particles causes large magnetic fields and a radioactive environment inside the accelerator tunnels and in the experimental caverns. The hazardous underground areas necessitate automated robotic solutions to perform maintenance and inspection tasks in place of humans. For this reason, CERN has a pool of various radiation tolerant robots \cite{dicastro2017, dicastro2018} that are used for remote maintenance, eliminating more than 120 annual human interventions.
+
+Currently, there is a need for more dexterous, portable manipulator solutions for reaching around complex structures where conventional manipulators fail. The CERN snake robot, a tendon-actuated robotic manipulator with rolling joints, is being developed for this reason. The robot is held together by four cables, traversing through each of the links. The links roll orthogonally on one another and have no mechanical couplings, so that the manipulator configuration is altered by adjusting the stiffness of the cables.
+
+%The cable endpoints are fastened to the end effector on one side, and the other side is connected to one platform for each cable behind the base. The platforms are connected to cylindrical screw shafts, where the platform positions can be moved by rotating the screws. These rotations are actuated with motors. Therefore, the motor torques do not adjust the cable forces directly. Since the screws are designed with a small pitch to prevent backdrive, direct cable force control is not a straightforward task.
+%\todo[inline]{Remove the above paragraph?}
+
+
+% In \cite{Robinson1999}, robot manipulator designs were classified into three types. Manipulators with motion occurring at discrete joints, such as conventional robot arms, are classified as discrete robots. When manipulators consist of shorter links with a greater number of joints, they are classified as serpentine robots. This design enables smooth motions resembling those of snakes, tentacles, or elephant trunks. The third category, continuum robots, lack separately identifiable links and joints, instead curving continuously through elastic deformation. The new CERN snake robot \cite{dantuono2023} has identifiable links and joints. However, its rolling joints cause the rotation axes to shift instantaneously during joint angle motions, unlike conventional revolute joints in discrete and serpentine robots. Additionally, its joints are neither directly nor separately actuated but instead bend continuously due to the cable forces. For these reasons, the robot arm can be classified as a continuum robot.
+
+%As a result, for a given set of external forces, the end-effector position is uniquely determined by the robot's configuration, meaning the robot is not kinematically redundant.
+
+Mathematical modeling of continuum robots is in general a very challenging task due to their highly nonlinear kinematics and dynamics. Although dynamic models exist, such as \cite{rucker2011a}, they are often computationally expensive and may not be suitable for real-time control. Many works instead focus on static and kinetic models \cite{rao2021} which allow control of the robots in a quasi-static fashion. A Newton-Euler dynamic model of the CERN snake robot was developed in \cite{dantuono2023, dantuono2024}. This resulted in an $N$-DoF dynamic model, where each DoF represents a joint angle. However, as joints in the same plane are kinematically dependent on each other during normal operations, the $N$-DoF model is redundant under standard operating conditions. In order to have a model suitable for real-time dynamic control of the robot, our goal is therefore to utilize data-driven system identification algorithms to develop an efficient lower-dimensional dynamic model of the CERN snake robot.
+
+System identification aims to develop mathematic models of dynamic systems based on data. The field has evolved significantly, particularly since the 1980s. The introduction of balanced truncation (BT) in \cite{moore1981} provided a systematic way of reducing the order of high-dimensional linear time-invariant (LTI) models, by preserving the most important dynamic properties through balancing the observability and controllability Gramians. Later, \cite{rowley2005} introduced balanced proper orthogonal decomposition (BPOD), a method to approximate these Gramians when analytical solutions are computationally infeasible. These approaches assume a mathematical model of the system, which is not always available.
+
+
+The development of the eigenvalue realization algorithm (ERA) in \cite{juang1985} enabled a purely data-driven approach for finding the Markov parameters in impulse-responses without any prior model knowledge. Its equivalence to BPOD was shown in \cite{ma2011}. For systems where obtaining the impulse response is difficult, the observer Kalman filter identification (OKID) was suggested in \cite{juang1991} to estimate the Markov parameters based on pseudo-random input signals. Other paradigms for system identification include the parametric models described in \cite{ljung1999} and subspace methods such as the numerical algorithm for subspace state space system identification (N4SID) from \cite{vanoverschee1994}. More recently, the dynamic mode decomposition (DMD) was formalized by \cite{schmid2010} for computational fluid dynamics to find discrete LTI models, and was extended in \cite{proctor2016} to include control inputs (DMDc).
+
+The above mentioned methods are all designed for LTI systems. However, interest in data-driven nonlinear modeling has grown in recent years. Extended DMD (EDMD) in \cite{williams2015} connects Koopman operator theory with control theory by lifting measured outputs to an infinite-dimensional Hilbert space of observable functions. This enables linear representation of nonlinear system dynamics. Some systems allow for Koopman-invariant subspaces that admit state variables, enabling finite-dimensional representations. This requires knowledge of suitable observable functions. The sparse identification of nonlinear dynamics (SINDY) in \cite{brunton2016} is a data-driven method that identifies an underlying sparse set of governing equations that describes the evolution of the system. This was later extended to also include control with the SINDYc algorithm in \cite{brunton2016a}.
+
+% - State of the art, and data-driven control on continuum robots. If relevant: Muller 2022 (disturbance observer for continuum robots when we already have a dynamic model)
+
+Due to the difficulty of modeling tendon-actuated systems, both kinematically and dynamically, several prior works have applied methods from data-driven control in order to identify their systems. In \cite{xu2017}, the results of several different approaches were compared to a common constant curvature approach for modeling the inverse kinematics of a 10-link tendon actuated manipulator, showing increased accuracy over the traditional model. In \cite{Muller2022}, a data-driven disturbance observer based on data-driven MPC was used to account for model discrepancies in a quasi-continuum robot, allowing a model-based controller to achieve zero control error. While attempts at learning the dynamics of continuum robots are fairly limited, \cite{bruder2019} shows promising results learning the end-effector dynamics of a pneumatic soft robot arm using Koopman operators, validating against nonlinear automated regression with exogenous inputs (NLARX), a neural network and a linear state space model.
+%\cite{yang2015, coulson2019}
+%\todo[inline]{Possibly shorten the historic perspective and mention more recent and relevant work}
+
+
+
+%. This results in a 2-DoF dynamic model that governs the evolution of the joint angle displacements based on the cable forces. The accuracy of the model is validated (demonstrated?) by comparing model simulations with real data.
+
+
+The main contributions of this paper are: Several linear and nonlinear data-driven modeling approaches were implemented in order to identify an accurate and efficient dynamic model of the CERN snake robot. The methods were tested against experimental data and the best models were shown to accurately capture the system behavior. Further, the identified models were used to develop a model predictive controller (MPC), demonstrating their feasibility for real-time model-based control.
+
+%We seek to implement a system identification algorithm on the CERN snake robot to obtain a generalized representation based on samples from driving the end effector around its workspace. This results in a 2-DoF dynamic model that governs the evolution of the joint angle displacements based on the cable forces. The accuracy of the model is validated (demonstrated?) by comparing model simulations with real data.
+
+The paper is organized as follows; \cref{sec:system} gives an overview of the manipulator system to be modeled, \cref{sec:datadriven} briefly summarizes the methods applied for modeling the system, before details on their implementation and validation are presented in \cref{sec:experiments}, together with experimental results of MPC implementations on two of the models. \cref{sec:conclusions} concludes the paper and discusses future work.
+
+\section{ROBOT SYSTEM OVERVIEW}
+\label{sec:system}
+This section presents the recently developed tendon-actuated continuum robot at CERN, giving an overview of its kinematic and dynamic properties.
+
+The CERN snake robot is a tendon-actuated robot with rolling joints, see \cref{fig:snake}. It consists of $N$ links, whose configuration is described by the vector of joint angles $\bm{q} \in \mathbb{R}^N$, with $N=6$ links for the current prototype. The robot is actuated by four tendons, each connected to a screw-drive motor mounted at the system base.  These tendons traverse through all the links to the end-effector. By moving the motors, the tendons can be tightened or loosened to control the robot’s configuration. Unlike conventional revolute joints, where each joint is actuated directly by a motor, the tendon-driven architecture leads to a non-unique set of cable tensions that can maintain the robot at a given configuration.
+
+Sensor measurements are available from force sensors on each tendon, and a camera-based positioning system giving the pose of each system link. The motors tightening the tendons can be controlled by setting position or velocity references, or by directly specifying motor currents to control the motor torque.
+
+\subsection{Kinematics}
+\label{sec:constant_ratio}
+
+The kinematics of the CERN snake robot were derived in \cite{hansen2025}. Here, the constant curvature assumption \cite{rao2021} was used for the inverse kinematics. Experimental data were collected using a grayscale camera motion tracking system for measuring the joint angles of the robot. The resulting data, shown in \cref{fig:constant_ratio}, reveal that joints closer to the base exhibit larger angular displacements than the joints farther from the base. Normalizing these values results in the lower plots, where joints in the same plane follow a similar pattern, suggesting a co-linearity between these joints. This observation motivates a modification of the constant curvature assumption.
+
+Rather than assuming a constant curvature, we assume a constant ratio between joint angles in the same plane, derived from experimentally observed maximum and minimum joint values:
+\begin{equation}
+\begin{split}
+    q_3 &\approx 0.6493 q_1, q_5 \approx 0.2053 q_1,\\
+    q_4 &\approx 0.6442 q_2, q_6 \approx 0.2291 q_2,
+\end{split}
+\end{equation}
+where $q_i$ is the angle of joint $i$. This ratio-based approximation effectively captures the robot's configuration using only two variables in most operational scenarios. However, it does not capture all dynamics when there are external forces acting on the middle links, or external torques on any of the links. Still, the assumption that the system state can be accurately described with a single coordinate for each rotational axis aligns with standard modeling approaches for continuum-, \cite{rao2021} and rolling-joint systems \cite{kim2014}.
+
+In addition to reducing model complexity, this kinematic dependency between the joint angles in the same planes also supports the choice of using the first two joint angles as the output of the data-driven dynamic model. Including all joints could introduce co-linearities in the outputs, potentially leading to linear dependencies in the learned system matrices, which may degrade the performance of some identification methods.
+%as co-linearities in the output might leads to linear dependencies in learned system matrices which causes issues with some methods.
+
+ \subsection{Dynamics}
+A dynamic model of the system was developed in \cite{dantuono2023}, and reformulated for control-oriented purposes in \cite{dantuono2024}, taking the standard form
+\begin{equation}
+    \bm{B}(\bm{q})\ddot{\bm{q}} + \bm{n}(\bm{q}, \dot{\bm{q}}) = \bm{\tau}.
+\end{equation}
+Here, $\bm{B} \in \mathcal{R}^{N \times N}$ is the system inertia matrix, $\bm{n} \in \mathbb{R}^N$ represents the Coriolis/centripetal effects and gravitational forces, and $\bm{\tau} \in \mathbb{R}^N$ is the control input, consisting of the generalized torque at each joint.
+
+However, this model does not accurately capture certain complex dynamics that is difficult to model, such as the friction affecting the tendons while moving through the robot. Moreover, as discussed in the previous section, the joint angles oriented in the same plane are kinematically dependent on each other during normal operation. Calculating the dynamics of each joint independently can therefore introduce redundancy and inefficiency. In the worst case, simulations using this full model may evolve into configurations that are not physically realizable or kinematically consistent.
+
+To address these challenges and improve computational efficiency, we seek to develop a reduced-order model that better reflects the robot’s true behavior using data-driven system identification methods. This approach allows us to capture the essential system dynamics without explicitly modeling all physical interactions, while still maintaining sufficient accuracy for control and prediction.
+
+\begin{figure}
+\centerline{\includegraphics[width=\linewidth]{figures/IFAC26/constant_ratio.png}}
+\vspace{-3mm}
+\caption{Pan (left) and tilt (right) joint angle displacements (upper) and their normalized values (lower).}
+\label{fig:constant_ratio}
+\vspace{-6mm}
+\end{figure}
+
+\section{Data driven modeling}
+\label{sec:datadriven}
+This section gives a brief introduction to the modeling approaches compared in the work, namely OKID-ERA, N4SID, DMDc, EDMDc, SINDYc and ARX.
+
+
+\subsection{Eigensystem realization algorithm (ERA)}
+
+ERA is a method for identifying the system matrices of a discrete linear time-invariant (LTI) system based on its impulse response\cite{juang1985,brunton2017}.  The discrete-time system is defined as:
+\begin{equation}
+\label{eq:discrete_system}
+\begin{split}
+    \bm{x}_{k+1} &= \bm{A} \bm{x}_k + \bm{B}\bm{u}_k  \\
+    \bm{y}_{k} &= \bm{C} \bm{x}_k + \bm{D}\bm{u}_k,
+\end{split}
+\end{equation}
+where $\bm{x} \in \mathbb{R}^n$, $\bm{u} \in \mathbb{R}^p$ and $\bm{y} \in \mathbb{R}^q$. When subjected to an impulse input, $\bm{u}_k^{\delta} \in \mathbb{R}^{p \times p} $, where $\bm{u}_0^{\delta}=I$ and $\bm{u}_k^\delta=0$ for $k>0$, the output sequence becomes
+\begin{equation}
+\label{eq:impulse_response}
+    \bm{y}_k^{\delta} =  \begin{cases}
+    \bm{D}, &k = 0 \\
+    \bm{C}\bm{A}^{k-1}\bm{B}, &k > 0.
+\end{cases}
+\end{equation}
+Note that for MIMO systems, each column of the matrices $\bm{y}^{\delta}_k$ and $\bm{u}_k^{\delta}$ correspond to a different experiment, applying an impulse input at each of the $p$ inputs. This sequence can be represented with a Hankel matrix
+\begin{equation}
+\label{eq:hankel}
+    \bm{H} = \begin{bmatrix}
+        \bm{y}_1^{\delta} & \bm{y}_2^{\delta} & \cdots & \bm{y}_{m_c}^{\delta}\\
+        \bm{y}_2^{\delta} & \bm{y}_3^{\delta} & \cdots & \bm{y}_{m_c+1}^{\delta}\\
+        \vdots & \vdots & \ddots & \vdots\\
+        \bm{y}_{m_o}^{\delta} & \bm{y}_{m_o+1}^{\delta} & \cdots & \bm{y}_{m_o+m_c-1}^{\delta}
+    \end{bmatrix} = \bm{\mathcal{OC}},
+\end{equation}
+where $\bm{\mathcal{O}}$ and $\bm{\mathcal{C}}$ are the observability and controllability matrices.
+%This relation comes directly from inserting \eqref{eq:impulse_response} to \eqref{eq:hankel}, such that no prior knowledge about the dynamic system is required to obtain the Markov parameters.
+Similar to the methodology of balanced truncation \cite{moore1981}, a singular value decomposition (SVD) of the Hankel matrix may be performed to sort the dynamics in order of the most dominant patterns. This allows us to extract the most dominant modes of the system, i.e. to choose $r$ system states to approximate the dynamics by truncating the remaining, least dominant, components of the system:
+\begin{equation}
+\label{eq:svd}
+    \bm{H} = \bm{U\Sigma V}^T =
+    \begin{bmatrix}
+        \Tilde{\bm{U}} & 
+        \bm{U}_t
+    \end{bmatrix}
+    \begin{bmatrix}
+        \Tilde{\bm{\Sigma}} & \bm{0}\\
+        \bm{0} & \bm{\Sigma}_t
+    \end{bmatrix}
+    \begin{bmatrix}
+        \Tilde{\bm{V}}^T\\
+        \bm{V}_t
+    \end{bmatrix} \approx \tilde{\bm{U}} \tilde{\bm{\Sigma}} \tilde{\bm{V}}^T.
+\end{equation}
+A second, time-shifted Hankel matrix $\bm{H}'$ is constructed, equivalent to \cref{eq:hankel}, but with all elements shifted one timestep. For this matrix, it holds that $\bm{H}' = \bm{\mathcal{O} A \mathcal{C}}.$
+
+The matrices $\bm{H}$, $\bm{H}'$ and the truncated SVD of $\bm{H}$ can now be used to approximate the system matrices $\bm{A}$, $\bm{B}$ and $\bm{C}$:
+\begin{subequations}
+\label{eq:era_approx}
+    \begin{equation}
+    \label{eq:era_approxa}
+        \Tilde{\bm{A}} = \Tilde{\bm{\Sigma}}^{-1/2} \Tilde{\bm{U}}^T \bm{H}' \Tilde{\bm{V}} \Tilde{\bm{\Sigma}}^{-1/2},
+    \end{equation}
+    \begin{equation}
+    \label{eq:era_approxb}
+        \Tilde{\bm{B}} = \Tilde{\bm{\Sigma}}^{1/2} \Tilde{\bm{V}}^T \begin{bmatrix}
+            \bm{I}_p & \bm{0}\\
+            \bm{0} & \bm{0}
+        \end{bmatrix},
+    \end{equation}
+    \begin{equation}
+    \label{eq:era_approxc}
+        \tilde{\bm{C}} = \begin{bmatrix}
+            \bm{I}_q & \bm{0}\\
+            \bm{0} & \bm{0}
+        \end{bmatrix} \Tilde{\bm{U}} \Tilde{\bm{\Sigma}}^{1/2}.
+    \end{equation}
+\end{subequations}
+
+\subsection{Observer Kalman filter identification (OKID)}
+
+Obtaining an impulse response from our robotic system is not straightforward, as the cable forces must maintain some nonzero pretension to keep the links in contact with each other. Moreover, both the cable forces and joint angle measurements are subject to sensor noise. Therefore, the OKID algorithm is used to approximate the impulse response from \eqref{eq:impulse_response}.
+
+The OKID algorithm aims to find an approximation of the Markov parameters on the form
+
+\begin{equation}
+\label{eq:okid_sdelta}
+    \bm{\mathcal{S}}^{\delta} = \begin{bmatrix}
+        \bm{y}_1^{\delta} & \bm{y}_2^{\delta} & \cdots & \bm{y}_{m}^{\delta}
+    \end{bmatrix},
+\end{equation}
+where $m$ is the number of time samples.
+% An optimal observer system is introduced:
+% \begin{equation}
+% \label{eq:optimal_observer_system}
+% \begin{split}
+%     \hat{\bm{x}}_{k+1} &= \bm{A}\hat{\bm{x}}_k+\bm{K}_f(\bm{y}_k - \hat{\bm{y}}_k)+\bm{Bu}_k\\
+%     \hat{\bm{y}}_k &= \bm{C}\hat{\bm{x}}_k + \bm{Du}_k,
+% \end{split}
+% \end{equation}
+% such that the state update can be re-written to
+% \begin{equation}
+% \label{eq:optimal_observer_rewritten}
+%     \hat{\bm{x}}_{k+1} = (\bm{A} - \bm{K}_f \bm{C})\hat{\bm{x}}_k + \begin{bmatrix}
+%         \bm{B} - \bm{K}_f \bm{D} & \bm{K}_f
+%     \end{bmatrix}
+%     \begin{bmatrix}
+%         \bm{u}_k\\\bm{y}_k
+%     \end{bmatrix},
+% \end{equation}
+% where $\bm{v}_k = \left[ \bm{u}_k^T, \bm{y}_k^T \right]^T$.
+To handle noise and correlation between signals, an optimal observer is introduced.  The discrete system in \eqref{eq:discrete_system} is augmented by defining the input vector as $\bm{v}_k = \left[ \bm{u}_k^T, \bm{y}_k^T \right]^T$.
+The relationship between arbitrary input-output pairs and the observed Markov parameters $\Bar{\bm{\mathcal{S}}}^{\delta}$ is given by
+\begin{equation}
+\begin{split}
+    \bm{\mathcal{S}} &= \Bar{\bm{\mathcal{S}}}^{\delta}\bm{\mathcal{V}},\\
+    \bm{\mathcal{S}} &= \begin{bmatrix}
+        \bm{y}_0 & \bm{y}_1 & \cdots & \bm{y}_m
+    \end{bmatrix}\\
+    \bm{\mathcal{V}} &= \begin{bmatrix}
+        \bm{u}_0 & \bm{u}_1 & \cdots & \bm{u}_l & \cdots & \bm{u}_m\\
+        \bm{0} & \bm{v}_0 & \cdots & \bm{v}_{l-1} & \cdots & \bm{v}_{m-1}\\
+        \vdots & \vdots & \ddots & \vdots & \ddots & \vdots\\
+        \bm{0} & \bm{0} & \cdots & \bm{v}_0 & \cdots & \bm{v}_{m-l}
+    \end{bmatrix}.
+\end{split}
+\end{equation}
+From this, the observed Markov parameters can be computed as $\Bar{\bm{\mathcal{S}}}^{\delta} = \bm{\mathcal{S}}\bm{\mathcal{V}}^{\dagger}$, where $\bm{\mathcal{V}}^{\dagger}$ is the Moore-Penrose pseudo-inverse of $\bm{\mathcal{V}}$.
+
+\subsection{Numerical algorithms for subspace state space system identification (N4SID)}
+\label{sec:n4sid}
+
+The Numerical Subspace State Space System Identification (N4SID) algorithm is a robust method for deriving the state-space representation of a discrete-time system on the form \cref{eq:discrete_system} based on input-output data. Like OKID-ERA, N4SID constructs block Hankel matrices from measured input-output sequences. SVD is applied to extract the dominant subspaces, allowing estimation of the system order and the associated observability matrix.
+
+A set of system inputs and outputs are organized into the matrices $\bm{U}_p, \bm{U}_f, \bm{Y}_p$, and $\bm{Y}_f$. Here,
+$\bm{U}_p$ and $\bm{U}_f$ are the block Hankel matrices of $\bm{u}_k$ for  $k = 1,2, \ldots ,m-1$ and $ k = m,m+1, \ldots ,2 m - 1$, respectively. The equivalent Hankel matrices for $\bm{y}_k$ are represented by $\bm{Y}_p$ and $\bm{Y}_f$. Combining these, and performing an LQ decomposition yields
+\begin{equation}
+    \begin{bmatrix}
+        \bm{U}_f \\ \bm{W}_p \\ \bm{Y}_f
+    \end{bmatrix}
+    =
+    \begin{bmatrix}
+        \bm{R}_{11} & \bm{0} & \bm{0} \\
+        \bm{R}_{21} & \bm{R}_{22} & \bm{0} \\
+        \bm{R}_{31} & \bm{R}_{32} & \bm{0}
+    \end{bmatrix}
+    \begin{bmatrix}
+        \bm{Q}_1^T \\ \bm{Q}_2^T \\ \bm{Q}_3^T
+    \end{bmatrix},
+\end{equation}
+where $\bm{W}_p = \left[ \bm{U}_p^T\ \bm{Y}_p ^T\right]^T$. As shown in \cite{vanoverschee1994}, the above expression yields the relation
+\begin{equation}
+\label{eq:n4_OX}
+    \bm{\mathcal{O}}_k \bm{X}_f = \bm{R}_{32} \bm{R}_{22}^{\dagger} \bm{W}_p,
+\end{equation}
+which can be approximated with the truncated SVD:
+\begin{equation}
+\label{eq:n4_SVD}
+    \bm{\mathcal{O}}_k \bm{X}_f \approx \bm{U}_s \bm{\Sigma}_s \bm{V}^T_s.
+\end{equation}
+%One benefit of this method is that a suitable order can be estimated at this step by looking at the significant singular values, without having any prior knowledge about the system. 
+From \cref{eq:n4_OX,eq:n4_SVD}, one can recover the observability matrix $\bm{\mathcal{O}}$ and the state trajectory $\bm{X}$ as:
+\begin{equation}
+\bm{\mathcal{O}} = \bm{U}_s \bm{\Sigma}_s^{1/2}, \quad \bm{X} = \bm{\Sigma}_s^{1/2} \bm{V}_s^T.
+\end{equation}
+By constructing the matrix $\bm{X}'$, which is the state trajectory shifted by one time step, the system matrices $\bm{A}, \bm{B}, \bm{C}$, and $\bm{D}$ can be found by solving the set of linear equations
+\begin{equation}
+    \begin{bmatrix}
+        \bm{X}' \\ \bm{Y}
+    \end{bmatrix} =
+    \begin{bmatrix}
+        \bm{A} & \bm{B} \\
+        \bm{C} & \bm{D}
+    \end{bmatrix}
+    \begin{bmatrix}
+        \bm{X} \\ \bm{\Upsilon}
+    \end{bmatrix}
+\end{equation}
+for $\bm{A}, \bm{B}, \bm{C},$ and $\bm{D}$. Here,
+\begin{equation}
+    \label{eq:upsilon}
+    \bm{\Upsilon} = \begin{bmatrix}
+        \bm{u}_1 & \bm{u}_2 & ... & \bm{u}_{m-1}
+    \end{bmatrix}
+\end{equation}
+is a matrix consisting of the control inputs at each time step. N4SID is widely used in control applications and is implemented in commercial tools such as MATLAB’s System Identification Toolbox \cite{MATLAB_SysID}.
+
+\subsection{Dynamic Mode Decomposition with control (DMDc)}
+\label{sec:DMD}
+
+Another data-driven approach for system identification is DMD, which is an equation-free technique for obtaining a discrete LTI model \cite{schmid2010}. DMDc \cite{proctor2016} extends the method to also identify the control terms. Given sets of state measurements
+\begin{align}
+    \bm{X} &= \begin{bmatrix}
+        \bm{x}_1 & \bm{x}_2 & ... & \bm{x}_{m-1}
+    \end{bmatrix} \\
+    \bm{X}' &= \begin{bmatrix}
+        \bm{x}_2 & \bm{x}_3 & ... & \bm{x}_{m}
+    \end{bmatrix},
+\end{align}
+and control inputs $\bm{\Upsilon}$ defined as in \cref{eq:upsilon}, DMD seeks to find matrices $\bm{A}$ and $\bm{B}$ that best approximate the system evolution via the linear relation
+\begin{equation}
+    \bm{X}' \approx \begin{bmatrix}
+        \bm{A} & \bm{B}
+    \end{bmatrix}\begin{bmatrix}
+        \bm{X} \\ \bm{\Upsilon}
+    \end{bmatrix} = \bm{G}\bm{\Omega}
+\end{equation}
+between the previous and future states. Here,
+$\bm{G} = \begin{bmatrix}
+    \bm{A} & \bm{B}
+\end{bmatrix}$, $\bm{\Omega} = \begin{bmatrix}
+    \bm{X}^T & \bm{\Upsilon}^T
+\end{bmatrix}^T.$ Since these matrices may in general be high-dimensional and impractical to work with, lower-dimensional approximations $\tilde{\bm{A}}, \tilde{\bm{B}}$ are found using SVD.
+\begin{subequations}
+\begin{align}
+    \bm{\Omega} &\approx \tilde{\bm{U}} \tilde{\bm{\Sigma}} \tilde{\bm{V}}^T \\
+    \bm{X}' &\approx \hat{\bm{U}} \hat{\bm{\Sigma}} \hat{\bm{V}}^T,
+\end{align}
+\end{subequations}
+where the matrices resulting from the SVD are truncated to $p$, and $r$ rows for $\bm{\Omega}$ and $\bm{X}'$ respectively. To separate the control effect from the system dynamics, $\tilde{\bm{U}} = [\tilde{\bm{U}}_1 \ \tilde{\bm{U}}_2]$ is split into two parts. The approximate system matrices can then be found as
+\begin{subequations}
+\begin{align}
+    \tilde{\bm{A}} &= \hat{\bm{U}}^T \bm{X}' \tilde{\bm{V}} \tilde{\bm{\Sigma}}^{-1} \tilde{\bm{U}}^T_1\hat{\bm{U}} \\
+    %
+    \tilde{\bm{B}} &= \hat{\bm{U}}^T \bm{X}' \tilde{\bm{V}} \tilde{\bm{\Sigma}}^{-1} \tilde{\bm{U}}^T_2.
+\end{align}
+\end{subequations}
+
+% A very important step in DMD is choosing the level of truncation. A higher level gives a more accurate model that captures more of the system dynamics, while a lower value gives a more computationally efficient approximation.
+
+\subsection{Extended dynamic mode decomposition with control \mbox{(EDMDc)}}
+
+Instead of attempting to find linear transitions between the states as in DMD, EDMD \cite{williams2015} seeks to find linear time advancements between nonlinear observables of the system states. The method is based on Koopman theory \cite{budisic2012}, stating that any nonlinear mapping can be represented by an infinite-dimensional linear operator acting on a Hilbert space. By using a suitable set of observables of the system states, this mapping may be approximated to be finite-dimensional, capturing the most important dynamic properties of the system in a finite, linear representation.
+
+The same state measurements are collected as in DMD, and a nonlinear library $\bm{g}(\bm{x}, \bm{u})$ is created. The method then attempts to find a linear relation
+\begin{equation}
+    \label{eq:koopman_relation}
+    \bm{g}(\bm{x}_{k+1}, *) = \mathcal{K} \bm{g}(\bm{x}_{k}, \bm{u}_k),
+\end{equation}
+using the DMD procedure. This provides a linear model describing the dynamics of the observables $\bm{g}$, from which the original state $\bm{x}$ easily can be extracted. A critical step is choosing the set of nonlinear functions, $\bm{g}$, which may include any nonlinear functions of the state and input. Common choices include polynomial and trigonometric functions, as well as known constant quantities such as the system Hamiltonian or system energy. For our system, trigonometric functions are necessary, as the forces and torques depend on the joint angle displacements.
+
+
+\subsection{Sparse Identification of Nonlinear Dynamics with Control (SINDYc)}
+\label{sec:SINDY}
+SINDY \cite{brunton2016} is a framework for learning sparse nonlinear dynamics from measured data. Its extension, SINDYc \cite{brunton2016a}, also allows learning the dynamics of systems with external inputs. The method is similar to DMD, but includes nonlinear terms in the model.
+Given sets of state measurements and control inputs $\bm{X}, \bm{X}', \bm{\Upsilon}$ as in DMDc, SINDYc attempts to learn a nonlinear relation on the form
+\begin{equation}
+    \bm{X}' = \bm{\Theta}(\bm{X}, \bm{\Upsilon}) \bm{\Xi}.
+\end{equation}
+Here $\bm{\Theta}(\bm{X}, \bm{\Upsilon})$ is a library of candidate nonlinear functions, for example
+\begin{equation}
+    \bm{\Theta}(\bm{X}, \bm{\Upsilon}) =
+    \begin{bmatrix}
+        \bm{X} & \bm{X}^2 & \bm{X}\bm{\Upsilon}... &\sin(\bm{X}) ....
+    \end{bmatrix},
+\end{equation}
+and $\bm{\Xi}$ is a sparse matrix of coefficients. These coefficients are found by solving the optimization problem
+\begin{equation}
+    \label{eq:sindy_optimization}
+    \bm{\xi}_k = \text{argmin}_{\bm{\xi}_k} \norm{\bm{X}' - \bm{\xi}_k \bm{\Theta}(\bm{X}, \bm{\Upsilon}) }_2 + \lambda \norm{\bm{\xi}_k}_1,
+\end{equation}
+for each row $\bm{\xi}_k$ of $\bm{\Xi}$, using a sequential thresholded least-squares procedure \cite{brunton2016}. Here $\lambda$ is a hyperparameter chosen to promote sparsity of $\bm{\Xi}$. 
+
+%Once this has been found, the learned system model is given by
+%\begin{equation}
+%    \bm{x}_{k+1} = \bm{\Theta}(\bm{x}_k, \bm{u}_k) \bm{\Xi}.
+%\end{equation}
+
+As with EDMD, finding a suitable set of nonlinear functions is crucial. If a nonlinear relationship exists and it is not represented in the function library $\bm{\Theta}$, it will not appear in the learned model. The sparsity-promoting optimization procedure ensures that terms with little or no effect are excluded from the final model, improving the model efficiency. 
+%Note that the same approach can be followed to learn continuous-time dynamics by fitting $\dot{\bm{x}}$ instead of $\bm{x}_{k+1}$.
+
+%\begin{rem}
+%    Note that if the nonlinear function library $\bm{\Theta}$ is chosen as the identity function $\bm{\Theta}(\bm{x}) = \bm{x}$, and the sparsity hyperparameter is chosen to be zero ($\lambda = 0$), this is equivalent to DMD in \cref{sec:DMD}.
+%\end{rem}
+
+\subsection{Automated Regression with eXogenous inputs (ARX)}
+\label{sec:arx}
+An ARX model belongs to a family of system models known as parametric models \cite{ljung1999}. These models are of the form
+\begin{equation}
+    \label{eq:parametric_model}
+    \bm{y}(t) = \bm{G}(q, \bm{\theta}) \bm{u}(t) + \bm{H}(q, \bm{\theta}) \bm{e}(t),
+\end{equation}
+where $q$ is the timeshift operator, $\bm{\theta}$ are the model parameters, and $\bm{e}(t)$ is a disturbance signal. Among the parametric models considered, ARX was found to provide the best performance on our system. Therefore, we chose to focus our attention on this method. For ARX models, \cref{eq:parametric_model} can be written as:
+\begin{align}
+    \label{eq:arx_equation}
+    \bm{x}_k &+ a_1\bm{x}_{k-1} + a_2\bm{x}_{k-2} + .... + a_n\bm{x}_{k-n_a} \notag\\
+    &= b_1\bm{u}_{k-1} + .... + b_n\bm{u}_{k-n_b} + \bm{e}_k,
+\end{align}
+which can also be expressed as
+\begin{equation}
+    \bm{x}(t) = \frac{\bm{B}_{\rm arx}}{\bm{A}_{\rm arx}} \bm{u}(t) + \frac{1}{\bm{A}_{\rm arx}} \bm{e}(t)
+\end{equation}
+with \begin{align}
+    \bm{A}_{\rm arx}(q) &= 1 + a_1 q^{-1} + a_2 q^{-2}... + a_{n_a} q^{-n_a}  \\
+    \bm{B}_{\rm arx}(q) &= b_1 q^{-1} + b_2 q^{-2} + ... + b_{n_b} q^{-n_b}.
+\end{align}
+This model consists of an autoregressive term, which linearly depends on its own previous values, and an exogenous term representing the control input. The parameters of the model are identified using linear regression. The ARX method is implemented in MATLAB's System Identification Toolbox \cite{MATLAB_SysID}.
+
+Other parametric models that were investigated include NLARX, autoregressive moving-average model (ARMAX), Output-Error, Box-Jenkins and Hammerstein-Wiener. Interestingly, using NLARX did not improve the accuracy over the standard linear ARX framework, suggesting that any nonlinear effects present in the system dynamics are not able to be captured by the nonlinear structure present in the NLARX model. This will be discussed further in \cref{sec:experiments}.
+
+\section{Experiments}
+\label{sec:experiments}
+In this section we present the experimental setup used to gather system data, how the models were implemented and validated against real robot measurements, and how the models were used to reconstruct the entire system state. Finally, we implement nonlinear and linear MPCs using the models to assess the real-time control performance on two selected models. 
+
+\subsection{Data collection}
+For the implementation of the system identification algorithms, data were collected from the robot prototype at CERN. The prototype was controlled using an open-loop kinematic controller based on \cite{hansen2025} to disambiguate the effects of a feedback controller. This was necessary as DMDc, EDMDc, SINDYc and N4SID cannot separate internal system dynamics from the effect of closed-loop control. The system performed a series of circular end-effector trajectories, starting with a radius of 1 cm, and increasing by 1 cm increments up to a circle with a 12 cm radius. Additionally, the robot was driven pseudo-randomly throughout the workspace to capture high-frequent dynamics and to avoid overfitting to the circular motion.
+
+The experiments were conducted using a one-section, six-link prototype of the robot (see \cref{fig:snake}). The tendon displacements were actuated by four Dynamixel XH430-W210-R motors, and the corresponding cable forces were measured using Flintec Y1 force sensors. Motion capture was done with Vicon Tracker 3.10.2 with four Vicon Vero grayscale cameras to measure the angle displacements for each joint. The cameras tracked reflective markers that were attached to each link. The cameras captured the entire workspace of the robot with an error margin of approximately $0.3$ mm. The joint angle measurements were low-pass filtered with a cut-off frequency of $0.001$ rad per sample.
+
+The input to the system identification algorithms consisted of the four cable force measurements, assuming that each cable force can be controlled independently. The output was the first two joint angles, obtained from the motion capture system.  Implementation details for the different methods are given in the appendix.
+
+
+\subsection{Model validation}
+To validate the identified models, their performance was evaluated on a dataset that was not used during training. The validation dataset consisted of similar motions to the training set, including circular end-effector trajectories and pseudo-random movements throughout the workspace. The results of the validation are shown in Table~\ref{tab:sysID_accuracy}, using the normalized root mean square error (NRMSE) as the performance metric, defined as
+\begin{equation}
+    \text{fit}_{\rm NRMSE} = 100 \left(1 - \frac{\norm{y - \hat{y}}}{\norm{y - \text{mean}(y)}} \right).
+\end{equation}
+The NRMSE value is $100\%$ if the simulated outputs perfectly match the experimental data, $0\%$ if the simulated output is no more accurate than using the mean of the experimental data as an estimate, and negative if the simulation performs worse than using the mean.
+
+%The NLARX method is not included as it got identical results to ARX as no nonlinear effects between the inputs, outputs and disturbances were captured with our tuning over the last eight timesteps \todo[inline]{Bjorn to the rescue?? No nonlinearities?!?!}.
+
+\begin{table}[h]
+    \centering
+    \renewcommand{\arraystretch}{1.2} % Adjust row height
+    \setlength{\tabcolsep}{10pt} % Adjust column spacing
+    \begin{tabular}{lc}
+        \toprule
+        \textbf{Method} & \textbf{NRMSE Accuracy (\%)} \\
+        \midrule
+        SINDYc        & 67.74\% \\
+        ARX           & 44.90\% \\
+        NLARX         & 44.90\% \\
+        N4SID         & 39.12\% \\
+        OKID-ERA      & 27.08\% \\
+        DMDc          & -10.76\%\\
+        EDMDc         & -11.34\% \\
+        \bottomrule
+    \end{tabular}
+    \vspace{2pt}
+    \caption{Accuracy comparison of different system identification methods.}
+    \vspace{-10pt}
+    \label{tab:sysID_accuracy}
+    \vspace{-4mm}
+\end{table}
+As shown in Table I, the SINDYc method achieved the best performance, with an NRMSE of 67.74\%. While the linear methods ARX, OKID-ERA, and N4SID also showed moderate accuracy, SINDYc outperformed them, benefiting from its ability to capture nonlinear system dynamics while maintaining a sparse model structure.
+
+DMDc and EDMDc performed poorly in this setting, resulting in negative NRMSE values. A potential reason for this is the fact that DMDc can only learn the dynamics of the measured variables, without estimating internal states. This contrasts with methods such as N4SID, and OKID-ERA, which estimate a chosen number of internal states and thus can capture more complex dynamics in systems with limited measurements. Additionally, the choice of nonlinear library in EDMDc may not have been well suited to capture the dynamics. Finding nonlinear observables with a linear time evolution is nontrivial, and for this robot system, no obvious Koopman basis is available. While ARX also lacks internal states, its ability to combine the measurements and forces from several previous timesteps allows it to fit more complex dynamics in this case.
+
+
+SINDYc, like ARX and DMDc, only learns the dynamics of the measured states, but its nonlinear formulation enables it to learn a much more complex nonlinear dynamic update than the linear models. Moreover, while SINDYc uses a nonlinear library similarly to that in  EDMDc, it does not require the lifted functions to evolve linearly in time. Its sparsity-promoting optimization procedure \cref{eq:sindy_optimization} automatically removes any unnecessary terms from the final model.
+The learned SINDYc model is given in the appendix. Note that, for brevity, the rows with no active parameters in either $y_1$, or $y_2$ are omitted. The final model contains only 37 active parameters, reduced from a candidate nonlinear library $\bm{\Theta}$ containing more than one hundred features.
+
+Attempts to improve the ARX model by introducing nonlinear terms did not yield better performance, suggesting that any nonlinearities present cannot be easily captured in an autoregressive structure.
+
+%From \cref{tab:sysID_accuracy}, it is clear that the SINDYc method performed the best, allthough the linear ARX, OKID-ERA, and N4SID methods also performed decently, with the benefit of being simpler linear models. While the fact that the nonlinear SINDYc model performed best suggests that nonlinearities are present in the system dynamics, the lacking performance of the nonlinear Hammerstein-Wiener and nonlinear ARX models suggests that the nonlinear effects are either difficult to accurately capture or mostly dominated by linear terms.
+
+%\todo[inline]{Should do tests of modeling only close to zero joint angles and check if it might be mostly linear in a subset of the reachable workspace.}
+
+\subsection{State reconstruction}
+As the learned models only give the first two joint angles, it is also necessary to investigate the accuracy of the constant joint ratio approximation used to estimate the remaining joint angles and thus to get a full system description. Based on the results in \cref{tab:sysID_accuracy}, the SINDYc model showed the best overall performance and was therefore selected as the basis for estimating the full joint configuration.
+
+Figure~\ref{fig:joints_sindy} shows the performance of the SINDYc algorithm on the validation dataset. The two first joint angles, which serve as outputs of the learned model, are shown in the left column. The four subsequent joint angles are reconstructed using the constant-ratio assumption discussed in \cref{sec:constant_ratio} and are shown in the center and right columns.
+
+\begin{figure}[htb!]
+    \centering
+    \includegraphics[width=\linewidth]{figures/IFAC26/joint_angles_sindy_new.png}
+    \vspace{-8mm}
+    \caption{Simulated joint angles using the 2 DoF SINDY model. Planar joints 1, 3, and 5. Pitch joints 2, 4, and 6.}
+    \label{fig:joints_sindy}
+    \vspace{-2mm}
+\end{figure}
+
+%The accuracy of the SINDYc algorithm is better for the pan plane than for the tilt plane, with respective values of $69.11\%$ and $67.58\%$. A possible explanation could be that the tilt plane is affected by the gravitational force to a greater extent, as the robot is pointing straight out in the horizontal plane.
+
+The simulated joint angle values are further converted to Cartesian end-effector positions using the forward kinematics in \cite{hansen2025}. The comparison between the simulated end-effector trajectory and the ground truth from the validation data is shown in \cref{fig:position_comparison}. The average Euclidean error between the simulated and measured end-effector positions was $2.48$ cm.
+
+\begin{figure}[htb!]
+    \centering
+    \includegraphics[width=\linewidth]{figures/IFAC26/pos_sindy_new.png}
+    \vspace{-10mm}
+    \caption{End effector comparison of SINDYc simulation vs validation data}
+    \label{fig:position_comparison}
+    \vspace{-5mm}
+\end{figure}
+
+\subsection{Real-time control}
+\label{sec:mpc}
+To further validate the learned models and assess their feasibility for real-time control, experiments were conducted using the models within a model predictive control (MPC) framework. The nonlinear SINDYc model was tested in the controller, and for comparison, a simpler and more computationally efficient linear MPC was also implemented using the identified N4SID model. Both controllers were implemented using the MPC toolbox in MATLAB \cite{MPCtoolbox}.
+
+The control task was trajectory tracking of the end effector position. To evaluate generalization to other motions than the ones used for training the model, the reference trajectory was chosen as a petal curve, shown in \cref{fig:mpc_petal}. The corresponding joint angle references were obtained by converting the end-effector reference position using the constant ratio assumption in \cref{sec:constant_ratio}. The cost function for the MPC was defined as
+\begin{equation}
+    J = \sum_{k=0}^{N-1} \left( \left\|\tilde{\bm{x}}_k^T\right\|_{\bm{Q}}^2 + \left\|\dot{\bm{u}}_k^T\right\|_{\bm{R}}^2  \right) + \left\|\tilde{\bm{x}}_N^T\right\|_{\bm{Q}_f}^2,
+\end{equation}
+where $\bm{\tilde{x}}_k$ denotes the deviation from the reference trajectory, and $\dot{\bm{u}}$ the rate of change of the control input. Since keeping the motors stationary requires no extra effort regardless of the cable tension, no penalty was applied to the absolute value of the control input $\bm{u}$, only its rate of change $\dot{\bm{u}}$. The MPC weights and constraints were chosen as $\bm{R} = 0.1 \bm{I}_{4}$, $\bm{Q} = \bm{Q}_f = \bm{I}_2$, input bounds $20 < \bm{u}< 190$, and state bounds $-1 < \bm{x} < 1$. 
+
+
+%\begin{figure}
+%    \centerline{\includegraphics[width=\linewidth]{figures/IFAC26/joints_mpc_flower.png}}
+%    \caption{Tracking performance of the first two joints using linear MPC}
+%    \label{fig:mpc_joints}
+%\end{figure}
+
+%\begin{figure}
+%\centerline{\includegraphics[width=\linewidth]{figures/IFAC26/lin_mpc_petal.png}}
+%\vspace{-3mm}
+%\caption{End effector tracking performance using linear MPC.}
+%\label{fig:lin_mpc_petal}
+%\vspace{-2mm}
+%\end{figure}
+
+
+\begin{figure}
+\vspace{-1mm}
+\centerline{\includegraphics[width=\linewidth]{figures/IFAC26/MPC_tracking_2.png}}
+\vspace{-3mm}
+\caption{End effector tracking performance using linear MPC.}
+\label{fig:mpc_petal}
+\vspace{-6mm}
+\end{figure}
+
+
+The joint tracking performance and end-effector position is shown in \cref{fig:mpc_petal}. Both the linear and nonlinear MPC manage to track the desired joint trajectories almost perfectly, with slightly better performance from the more accurate, nonlinear SINDYc model. Much of the error can be attributed the low-level tendon force controller which was unable to completely track the desired tendon forces, due to both slow motor dynamics and coupling effects between the tendons.
+
+The end-effector position does not show the same level of performance as the joint tracking, implying that the constant ratio assumption is not completely accurate for more complex system motions. Especially the two outermost joints show some discrepancy, as seen in \cref{fig:joints_sindy}. Nevertheless, the end-effector successfully captures the overall petal shape despite the intricate trajectory. For tasks requiring more accurate end-effector positioning, the controller could be augmented to include feedback of the end-effector position, and thus compensate for the kinematic uncertainties.
+
+\section{Conclusion and future work}
+\label{sec:conclusions}
+This paper presented the development and first experimental validation of a data-driven 2-DoF dynamic model for a tendon-actuated manipulator with rolling joints developed at CERN. Several system identification techniques—both linear and nonlinear—were implemented and compared. Among these, the SINDYc algorithm achieved the best performance, yielding a joint angle accuracy of 67.74\% and an average Euclidean end-effector error of 2.48 cm. The remaining joint angles were estimated using a constant-ratio assumption based on experimental data, enabling full-body reconstruction from a reduced-order model. The identified models were successfully applied in the design of a model predictive controller (MPC), demonstrating their suitability for real-time, model-based control of the system.
+
+%The data collection is based on measurements on cable forces and joint angles from controlling the robot in both deterministic and pseudo-random motions around on the workspace with a kinematic joint controller. After comparing several state-of-the-art system identification methods, the SINDYc algorithm proved to obtain the best lowest NRMSE. The input of the algorithm is the cable forces, and the output is the two joints closest to the base, covering the motions in the horizontal and vertical planes. The remaining joints were estimated using a constant-ratio assumption between joints in the same plane, based on measurements of the joint angles in experiments. Compating the SINDYc simulations to experimental data yielded a joint angles NRMSE  of $68.34\%$ and the Euclidean error of the end effector position of $2.48$ cm.
+
+Future work includes extending the methodology to multi-section continuum robots, incorporating adaptive system identification for dynamic environments, and exploring the integration of learned models into feedback control strategies beyond MPC. Future developments on the control side also require updating the low-level tendon-force controller, which seems to be the limiting factor for control performance at the moment. Further refinement of the joint angle estimation technique may also enhance reconstruction accuracy in scenarios with external disturbances.
+
+\appendix
+\label{app:implementation}
+
+SINDYc was implemented based on \cite{brunton2017}. After a coarse search through powers of ten, followed by a more refined parameter sweep, $\lambda=0.0035$ was found to provide a good balance between sparsity and model accuracy, resulting in the model presented below. The ARX model was implemented using the MATLAB System Identification Toolbox \cite{MATLAB_SysID}, with parameters set as $n_a = 8 * {\rm ones}(n_y, n_u), n_b = 8 * {\rm ones}(n_u, n_y),$ and $ n_k = 1 * {\rm ones}(n_y, n_u) $. The same toolbox was also used for N4SID, with a model order of 8. The implementation of OKID-ERA was based on \cite{brunton2017}, with a model order of 8, while DMDc and EDMDc were implemented following the approaches in \cite{proctor2016} and \cite{williams2015}, respectively.
+
+
+\begin{table}[ht]
+\label{tab:sindy_params}
+\centering
+\begin{tabular}{l r r}
+\hline
+\textbf{Feature} & \textbf{$y_1$} & \textbf{$y_2$} \\
+\hline
+$y_1$ & 8.483 & -6.309 \\
+$y_2$ & 7.474 & 3.145 \\
+$u_1$ & 0 & 4.771e-05 \\
+$u_2$ & 6.435e-05 & 0 \\
+$u_3$ & 0 & -3.928e-05 \\
+$u_4$ & -5.709e-05 & 0 \\
+$y_1 \times y_1$ & -38.6 & -112.5 \\
+$y_1 \times y_2$ & -0.007195 & 0.01099 \\
+$y_1 \times u_1$ & 0 & -6.331e-05 \\
+$y_1 \times u_2$ & -8.477e-05 & 0 \\
+$y_1 \times u_3$ & -8.217e-05 & 0 \\
+$y_2 \times y_2$ & 38.84 & 112.6 \\
+$y_2 \times u_1$ & 0 & -8.626e-05 \\
+$y_2 \times u_2$ & 0 & -7.301e-05 \\
+$\sin(1.0 \times y_1)$ & -10.06 & 8.467 \\
+$\sin(1.0 \times y_2)$ & -10.03 & -2.877 \\
+$\cos(1.0 \times y_1)$ & -103.9 & -302.3 \\
+$\cos(1.0 \times y_2)$ & 103.7 & 302.2 \\
+$\cos(1.0 \times u_3)$ & -5.013e-05 & 0 \\
+$\sin(2.0 \times y_1)$ & 1.286 & -1.078 \\
+$\sin(2.0 \times y_2)$ & 1.278 & 0.3666 \\
+$\cos(2.0 \times y_1)$ & 6.675 & 19.3 \\
+$\cos(2.0 \times y_2)$ & -6.509 & -19.23 \\
+$\cos(2.0 \times u_3)$ & 0 & 7.827e-05 \\
+\end{tabular}
+%\vspace{0.3em}  % Adds some space after the table
+\caption{Active parameters in the identified SINDYc model. \vspace{-2em} }
+\vspace{-2mm}
+\end{table}
+
+
+
+\ifSubfilesClassLoaded{%
+  \bibliographystyle{\chosenbibstyle}
+  \bibliography{\bibfilename}
+}{}
+
+\end{document}
+

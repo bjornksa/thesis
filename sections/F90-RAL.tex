@@ -1,0 +1,675 @@
+\documentclass[../main.tex]{subfiles}
+\begin{document}
+
+\chapter{Passivisation of stricly prioritized regulation controllers using virtual energy tanks}
+
+A robot with kinematical redundancy with respect to a main task may perform additional tasks simultaneously with the main one. 
+    Often, it is desirable to prioritize the performance of some tasks over that of others. 
+    % One way to ensure that lower-prioritized tasks do not interfere with the performance of higher-prioritized tasks is through 
+    To create a strict priority between the different tasks, meaning the performance of higher-prioritized tasks is unaffected by lower-prioritized tasks, null-space projections are often used. 
+    Null-space projections may, however, cause the closed-loop system to lose the desirable passivity property, which
+    is necessary to ensure stable interactions with passive environments.
+    % ensures the stability of the system even if it physically interacts with a passive environment. 
+    In previous works, an energy tank has therefore been introduced to compensate for the potential activity stemming from the null-space projections. 
+    % However, when using these methods, the performance of the lower-prioritized tasks suffers more than when using a classical hierarchical control scheme if the energy tanks become empty.
+    However, if the energy tank becomes empty when using these previous methods, the performance of the lower-prioritized tasks suffers more than when using a classical, non-passive hierarchical control scheme.
+    % In this work, an energy tank is therefore introduced to the system to compensate for the potential activity stemming from the null-space projections.
+    Thus, a new approach to handling 
+    % the energy tank becoming empty 
+    this case is proposed in this work. 
+    In the event of the energy tank becoming empty and unable to compensate for any null-space projection-induced activity, the hierarchy is ceded to preserve the passivity of the system, leading to better performance of the lower-prioritized tasks compared to previous passivation schemes.
+    Output strict passivity of the closed-loop system is proven irrespective of the amount of energy available from the energy tank, and the performance of the proposed method is validated and compared to that of a classical hierarchical impedance controller and that of an earlier passivation method through simulation and experiments of redundant robotic manipulators.
+    
+    
+\section{Introduction} \label{sec:introduction}
+% \IEEEPARstart{W}{hen} a robot goes in and out of physical contact with its environment, its dynamics will suddenly change. This may lead to the robot causing harm to itself and its environment as a result of the closed-loop system becoming unstable. If the environment is \textit{passive}, however, this can be avoided by designing the controller such that the closed-loop system is passive as well, since the interconnection of the two will then be passive and thus (0-input) stable in the sense of Lyapunov \cite[Thm. 6.1 \& Lem. 6.6]{khalil2002nonlinear}. It turns out that any non-passive robot can be destabilized by a passive environment \cite{stramigioliEnergyAwareRobotics2015}, and thus passivity is a desirable property for any robot that might interact with its surroundings. Furthermore, if the robot is \textit{output strictly} passive, it is also finite-gain $\mathcal{L}_2$ stable under certain conditions \cite[Lem.~6.5]{khalil2002nonlinear}.
+% % , meaning a ``well-behaved'' input will yield a ``well-behaved'' output.
+
+When a robot goes in and out of physical contact with its environment, its dynamics will suddenly change. This may lead to the robot causing harm to itself and its environment as a result of the closed-loop system becoming unstable. 
+It turns out that the closed-loop system being \textit{passive} is a necessary condition for guaranteeing stable interactions with environments that are also passive: Any non-passive robot can be destabilized by a passive environment \cite{stramigioliEnergyAwareRobotics2015}.
+If the robot satisfies the stronger notion of \textit{output strict} passivity as well, though, it no longer just satisfies a necessary condition for stability. 
+Under certain conditions, it can then be shown to be finite-gain $\mathcal{L}_2$ stable too \cite[Lem.~6.5]{khalil2002nonlinear}. Thus, passivity, and particularly output strict passivity, are desirable properties for any robot that might interact with its surroundings.
+
+% ? Is this paragraph needed? 
+Another control approach that is often used when a robot manipulator may interact with its environment is impedance control \cite{hoganImpedanceControlApproach1984}. During contact, this method typically yields better performance than simple position or force controllers do, as it commands a force based on the robot's position, velocity and acceleration, instead of just the error in either position or force. %?, respectively. 
+In this work, we will look at the special case where the desired inertia of the robot is its natural inertia, which eliminates the need for force feedback.
+% In the special case where the desired inertia of the robot is the natural inertia, the need for force feedback is eliminated. 
+% This is called \textit{compliance} control, and has been used several times before on kinematically redundant robots, e.g. in \cite{albu-schafferCartesianImpedanceControl2003}.
+This is called \textit{compliance} control, and has proven to be an effective method for robot manipulators, including those that are \textit{kinematically redundant} \cite{albu-schafferCartesianImpedanceControl2003}. %! See if you can rewrite this
+
+A kinematically redundant robot, meaning a robot with more actuated degrees of freedom (DoFs) than a task requires, can perform additional tasks simultaneously to the original task.
+Often, some of these tasks are more important to the user than others, and it is therefore desirable to prioritize some tasks' performance over that of others. Frameworks that allow such a prioritization of tasks are called \textit{hierarchical} or \textit{task-priority} control schemes \cite{nakamuraTaskPriorityBasedRedundancy1987}.
+These schemes are typically divided into two categories: \textit{soft}, e.g. \cite{saliniSynthesisComplexHumanoid2011}, and \textit{strict} task priority, e.g. \cite{ottPrioritizedMultiTaskCompliance2015}. 
+% In a strict priority scheme, lower-prioritized tasks do not interfere with the performance of higher-prioritized tasks, whereas this might happen in a soft priority scheme. 
+In strict task-priority schemes, the execution of higher-prioritized tasks is unaffected by that of any lower-prioritized tasks.
+If a soft task-priority scheme is used instead, the same guarantee cannot be given, and thus strict priority frameworks are often preferred.
+The strict task-priority frameworks may be implemented using optimization \cite{kanounKinematicControlRedundant2011} or null-space projections \cite{khatibUnifiedApproachMotion1987}, with the latter often being favoured due to typically being less computationally demanding. Thus, this is also the approach taken in this work.
+% \todo[inline]{Find a source for this claim.} %? Do I really need a source for this? Linear algebra quicker than most optimization...
+
+It can be shown, however, that the use of null-space projections may lead to the closed-loop system losing the desirable passivity property \cite{dietrichPassivationProjectionBasedNull2016}. The stability of robots with classical hierarchical controllers based on null-space projections can therefore not be guaranteed during physical contact with passive environments. To remedy this, \cite{dietrichPassivationProjectionBasedNull2016} and \cite{dietrichPassiveHierarchicalImpedance2017} introduced a virtual energy tank to the system to compensate for the possible activity caused by the null-space projections.
+
+% It can be shown, however, that the use of null-space projections may lead to the closed-loop system losing the desirable passivity property \cite{dietrichPassivationProjectionBasedNull2016}, meaning stable interactions with all passive environments cannot be shown.
+
+Virtual energy tanks are virtual reservoirs of pre-stored energy that can be used to passivate actions that would otherwise be active. The concept has been used in for instance \cite{schindlbeckUnifiedPassivitybasedCartesian2015,shahriariValvebasedVirtualEnergy2018,benziAdaptiveTankbasedControl2022} to maintain the desired performance of tasks achieved by non-passive controllers, but, when an action would violate passivity using a classical controller, the virtual tank is drained of energy instead, such that the total energy of the system does not increase. 
+
+The work from \cite{dietrichPassivationProjectionBasedNull2016} and \cite{dietrichPassiveHierarchicalImpedance2017} was extended in \cite{michelPassivitybasedVariableImpedance2020} and \cite{michelSafetyAwareHierarchicalPassivityBased2022} to not only passivate null-space projections, but also a time-varying stiffness in the compliance controller. The latter of the two also placed an additional layer of safety on the system by bounding its kinetic energy from above. All of these methods, \cite{dietrichPassivationProjectionBasedNull2016,dietrichPassiveHierarchicalImpedance2017,michelPassivitybasedVariableImpedance2020} and \cite{michelSafetyAwareHierarchicalPassivityBased2022}, suffer from the same drawback, though: When the energy tank is empty, the performance of all lower-priority tasks suffers even more than what it would do if a standard non-passive hierarchical compliance controller was used. 
+
+In this work, the method presented in \cite{dietrichPassiveHierarchicalImpedance2017} is modified such that the above problem does not occur. The possible passivity-violations stemming from null-space projections are compensated for by using energy tanks, just as in the previously mentioned works. However, instead of further sacrificing the performance of lower-priority tasks if the energy tank becomes empty, the null-space projections are removed from the scheme. As a result, there is no longer a hierarchy between the tasks. The passivity of the system is still ensured, however, and, in contrast to previous methods, the originally lower-prioritized tasks' performance does not suffer as a result of the energy tank being completely drained. The proposed method is proven to ensure output strict passivity, yielding advantageous stability results in the input-output sense, and is validated through simulations of a fully actuated double pendulum and experiments using a Franka Emika Panda robot manipulator. The results of the simulations and experiments are then compared to those gotten from the classical hierarchical impedance controller and the method presented in \cite{dietrichPassiveHierarchicalImpedance2017}.
+
+It should be noted that, in the view of the authors, the proposed method is not an \textit{improvement} of \cite{dietrichPassiveHierarchicalImpedance2017}, but rather an \textit{alternative} to it that has complementary properties. While \cite{dietrichPassiveHierarchicalImpedance2017} always preserves the strict task hierarchy, but yields steady-state errors in the lower-priority tasks if the energy tank is empty, the proposed method does not yield steady-state errors, but cedes the hierarchy if the tank is empty. Depending on the application, one approach might be preferred over the other, but it is not clear that either one is superior in general. If the performance of the main task is safety-critical, choosing the previous method is prudent, whereas if preserving steady-state accuracy of lower-priority tasks is important, while some degradation in transient performance of higher-priority tasks is acceptable, the proposed approach may be more suitable.
+
+The paper is organized as follows: In \cref{sec:background}, the fundamentals of hierarchical control and a previous approach to passivate such a controller is presented. Then, in \cref{sec:approach}, the proposed method is presented and proven to yield output strict passivity. The simulation and experimental results validating the method are given in \cref{sec:sim+exp}, before the conclusions and future work are presented in \cref{sec:conclusions}.
+
+
+\section{Background} \label{sec:background}
+The dynamics of an $n$-DoF robot manipulator with joint configuration given by $\bm{q}\in \mathbb{R}^{n}$ can be described by the following equation:
+\begin{equation} \label{eq:robot_dynamics}
+    \bm{M}(\bm{q})\ddot{\bm{q}} + \bm{C}(\bm{q},\dot{\bm{q}})\dot{\bm{q}} + \bm{g}(\bm{q}) = \bm{\tau} + \bm{\tau}^\mathrm{ext}.
+\end{equation}
+% \todo[inline]{Does this need to be sourced? Or counts as standard knowledge}
+Here, $\bm{M}(\bm{q}) = \bm{M}(\bm{q})^T > \bm{0} \in \mathbb{R}^{n\times n}$ is the inertia matrix, $\bm{C}(\bm{q},\dot{\bm{q}})\in \mathbb{R}^{n\times n}$ is the Coriolis matrix and $\bm{g}(\bm{q})\in \mathbb{R}^{n}$ is the generalized gravitational forces, while $\bm{\tau}\in \mathbb{R}^{n}$ and $\bm{\tau}^\mathrm{ext}\in \mathbb{R}^{n}$ are the control input and the generalized external forces acting on the robot, respectively. The Coriolis matrix is formulated such that $\dot{\bm{M}}(\bm{q}) = \bm{C}(\bm{q},\dot{\bm{q}}) + \bm{C}(\bm{q},\dot{\bm{q}})^T$ holds. 
+From this point on, we will omit the matrices' dependencies for the sake of readability when the dependencies are clear from the context or already defined. 
+% To aid in readability, we will omit writing the dependencies of the matrices from this point.
+
+A task hierarchy consisting of $r$ tasks can be defined as follows: Each task coordinate is given by $\bm{x}_i = \bm{f}_i(\bm{q}) \in \mathbb{R}^{m_i}$, and its velocity by
+\begin{equation} \label{eq:xdot_qdot}
+    \dot{\bm{x}}_i = \frac{\partial \bm{f}_i(\bm{q})}{\partial \bm{q}} \dot{\bm{q}}  =\bm{J}_i(\bm{q})\dot{\bm{q}},
+\end{equation}
+where $i=1,\dots, r$ and $m_i \in \mathbb{N}$. The tasks are ordered by their priority such that the highest prioritized task has index $i=1$ and the lowest prioritized task has index $i=r$, and the sum of the task dimensions is assumed to be equal to the robot's number of DoFs, $\sum_{i=1}^{r}m_i = n$.
+% \todo[inline]{Sjekk om det fungerer for $\sum m_i > n$ også!}
+% Doesn't really make sense to have m_i > n when the control torques are mixed together
+Furthermore, each Jacobian $\bm{J}_i$ is assumed to be full row rank, and the stacked Jacobian, $\bm{J} = [\bm{J}_1^T, \dots, \bm{J}_r^T]^T$, is assumed to be non-singular.
+To be able to conclude output strict passivity instead of just passivity in \cref{ssec:passivity_analysis}, we also assume that the smallest singular value of $\bm{J}$ is lower bounded away from zero:
+\begin{equation} \label{eq:sing_val_bound}
+    \sigma_\mathrm{min}(\bm{J}) \geq \underline{\sigma} > 0.
+\end{equation}
+This is the case if, for instance, 
+% $\bm{J}$ is continuous in $\bm{q}$ (in addition to being non-singular), and 
+$\bm{q}$ belongs to a compact space (and the previous assumption on $\bm{J}$ holds).
+
+\subsection{Hierarchical dynamics}
+To avoid lower-priority tasks from interfering with the execution of higher-prioritized tasks, a hierarchical controller can be used. To express the dynamic equation of the strict hierarchy, we first introduce the hierarchy-consistent task velocities $\bm{v}_i \in \mathbb{R}^{m_i}$ for $i=1,\dots,r$:
+\begin{equation}\label{eq:v}
+    % \bm{v} =
+    \begin{bmatrix}
+        \bm{v}_1 \\
+        \vdots \\
+        \bm{v}_r
+    \end{bmatrix} =
+    \begin{bmatrix}
+        \bar{\bm{J}}_1 \\
+        \vdots \\
+        \bar{\bm{J}}_r
+    \end{bmatrix} \bm{\dot{q}}
+    =
+    \bar{\bm{J}} \bm{\dot{q}}.
+\end{equation}
+Here, the $\bar{\bm{J}}_i$ matrices, which will be defined in the next paragraph, are the dynamically consistent Jacobian matrices that make up the invertible matrix $\bar{\bm{J}} \in \mathbb{R}^{n\times n}$. %, when stacked,
+By premultiplying by $\bar{\bm{J}}^{-T}$ and using \eqref{eq:v}, the dynamics \eqref{eq:robot_dynamics} can be written as %in a hierarchically decoupled manner,
+\begin{equation} \label{eq:hierarchical_dynamics}
+    \bm{\Lambda}(\bm{q})\dot{\bm{v}} + \bm{\mu}(\bm{q},\dot{\bm{q}})\bm{v} = \bar{\bm{J}}(\bm{q})^{-T}\left( -\bm{g}(\bm{q}) + \bm{\tau} + \bm{\tau}^{\mathrm{ext}}\right),
+\end{equation}
+where $\bm{\Lambda} = \bar{\bm{J}}^{-T}\bm{M}\bar{\bm{J}}^{-1} \in \mathbb{R}^{n\times n}$ is the block-diagonal inertia matrix, and $\bm{\mu}=\bm{\Lambda}\left( \bar{\bm{J}}\bm{M}^{-1}\bm{C} - \dot{\bar{\bm{J}}} \right)\bar{\bm{J}}^{-1} \in \mathbb{R}^{n\times n}$ is the Coriolis matrix that satisfies $\dot{\bm{\Lambda}} = \bm{\mu} + \bm{\mu}^T$.
+
+Each dynamically consistent task Jacobian is described by $\bar{\bm{J}}_i = \left( \bm{Z}_i \bm{M}\bm{Z}_i^T \right)^{-1}\bm{Z}_i\bm{M} \in \mathbb{R}^{m_i\times n}$, apart from for the top-prioritized task, which is the same as the original task Jacobian, $\bar{\bm{J}}_1 = \bm{J}_1$. The $\bm{Z}_i$ matrices are null-space base matrices of the augmented Jacobian matrix $\bm{J}^{\mathrm{aug}}_{i-1} = \left[ \bm{J}_1^T, \dots, \bm{J}_{i-1}^T \right]^T$ fulfilling $\bm{J}_j \bm{Z}_k^T=\bm{0}$ $\forall k>j$, and a full expression for them can be found in e.g. \cite{ottPrioritizedMultiTaskCompliance2015}.
+For consistency, we will denote $\bm{Z}_1 = \left( \bm{J}_1^{\bm{M}+} \right)^T$, where $\bm{J}_{1}^{\bm{M}+}=\bm{M}^{-1}\bm{J}_{1}^T(\bm{J}_{1}\bm{M}^{-1}\bm{J}_{1}^T)^{-1}$ is the dynamically consistent pseudoinverse \cite{khatibUnifiedApproachMotion1987}.
+% \todo[inline]{Should I rather focus on either $\bm{Z}$ or $\bm{N}$ instead of using both?}
+
+
+% In this work, we will also use
+For ease of notation, we will mainly use the classical null-space projector \cite{khatibUnifiedApproachMotion1987},
+\begin{equation}
+    \bm{N_}{i}=(\bm{I} - (\bm{J_}{i-1}^\mathrm{aug})^T((\bm{J_}{i-i}^\mathrm{aug})^{\bm{M}+})^T),
+\end{equation}
+% for $i = 2, \dots, r$, with $\bm{N}_1 = \bm{I}$, for shorter and more readable notation.
+in this work instead of the null-space base matrix $\bm{Z}_i$. 
+% The projector is related to the null space base matrix $\bm{Z}_i$ by
+The two are related through
+\begin{equation} \label{eq:NandZ}
+    \bm{N_}{i}\bm{J_}{i}^T = \bar{\bm{J}}_{i}^T\bm{Z}_{i}\bm{J_}{i}^T,
+\end{equation}
+and one can thus always use $\bar{\bm{J}}_i^T\bm{Z}_i$ instead of $\bm{N}_i$ in this work.
+Note that using $\bm{N}_i$ is for notational simplicity and that the use of $\bm{Z}_i$ is recommended in practice, as it is often less computationally expensive \cite{ottNullspaceStiffness2008}.
+
+\subsection{Classical non-passive hierarchical impedance control} \label{ssec:classical_controller}
+The classical way of achieving impedance control in a strict task-priority framework is to design a control law of the form \cite{ottPrioritizedMultiTaskCompliance2015}
+\begin{equation} \label{eq:task_priority_control_law}
+    \bm{\tau}= \bm{g}+\bm{\tau}_{\mu}+\sum_{i=1}^r \bm{\tau}_{i},
+\end{equation}
+where $\bm{g}$ compensates for the gravitational forces, $\bm{\tau}_{\mu}$ compensates for the off-blockdiagonal terms of $\bm{\mu}$, decoupling the task dynamics, and $\bm{\tau}_i$ is the torque performing task $i$. By applying \eqref{eq:task_priority_control_law} to the dynamics \eqref{eq:hierarchical_dynamics}, the closed-loop dynamics are then given in a hierarchically decoupled manner by
+\begin{equation} \label{eq:closed-loop_hierarchical_dyn}
+    \bm{\Lambda} \dot{\bm{v}} + \operatorname{blkdiag}(\bm{\mu}) \bm{v}=\bar{\bm{J}}^{-T}\left( \sum_{i=1}^r\bm{\tau_}{i}+\bm{\tau}^\mathrm{ext} \right).
+\end{equation}
+% Notably, the term $\bm{\tau}_{\mu}$ is power-conserving, meaning $\bm{\tau}_{\mu}^T \dot{\bm{q}} = 0$, as the off-blockdiagonal terms satisfy the property $\bm{\mu}_{i,j} = -\bm{\mu}_{j,i}^T$. Thus, $\bm{\tau}_{\mu}$ can be safely omitted from an analysis of the system's passivity with respect to $(\dot{\bm{q}},\bm{\tau}^\mathrm{ext})$.
+% \todo[inline]{Is that really the reason why? $\bm{g}$ is also omitted, because it is cancelled out!}
+% ! Double-check that this part is not important!
+\begin{figure}[tb]
+    \centering
+    % \includesvg[width=0.5\textwidth]{figures/RAL/non-passive}
+    % \includegraphics[width=0.45\textwidth]{figures/RAL/non-passive.eps}
+    \includegraphics[width=\linewidth]{figures/RAL/non-passive.eps}
+    \caption{Non-passive, classical hierarchical impedance control for task $i=2, \dots, r$. In contrast to the transposed Jacobian $\bm{J}_i^T$, the null-space projector $\bm{N}_i$ does not have a dual counterpart in the flow-path. The total transformation is thus not power-conserving.}
+    \label{fig:classical_non-passive}
+\end{figure}
+
+The task-related torques $\bm{\tau}_i$ are given by
+\begin{equation} \label{eq:tau_i_non-passive}
+    \bm{\tau}_{i} = \bm{N}_i\bm{J}_i^T\bm{F}_i,
+\end{equation}
+where the operational space force $\bm{F}_i$ is first transformed to a joint torque by $\bm{J}_i^T$, and then projected onto the null-space of the higher-prioritized tasks by $\bm{N}_i$. The force $\bm{F}_i$ is chosen as
+\begin{equation} \label{eq:F_i}
+    \bm{F}_{i}(\bm{x}_i, \dot{\bm{x}}_i)=-\bm{K}_{i}\tilde{\bm{x}}_{i} - \bm{D}_{i}\dot{\bm{x}}_{i}
+\end{equation}
+to realize the desired spring-damper behavior of the closed-loop system \eqref{eq:closed-loop_hierarchical_dyn}, \eqref{eq:tau_i_non-passive}. Here, $\tilde{\bm{x}}_{i} = \bm{x}_{i} - \bm{x}_{i,d}$ is the error of task $i$, as $\bm{x}_{i,d} \in \mathbb{R}^{m_i}$ is the constant desired task state, while $\bm{K}_{i} \in \mathbb{R}^{m_i\times m_i}$ and $\bm{D}_{i} \in \mathbb{R}^{m_i\times m_i}$ are positive definite stiffness and damping matrices, respectively.
+
+This classical impedance controller does, however, not yield a passive system. As seen in \cref{fig:classical_non-passive}, which is essentially the same as \cite[Fig.~1]{dietrichPassivationProjectionBasedNull2016}, we cannot guarantee that the power $\dot{\bm{x}}_i^T\bm{F}_i$ is not increased through the transformation to the power $\dot{\bm{q}}^T\bm{\tau}_i$, meaning we cannot guarantee the passivity of the system. This is due to the null-space projector $\bm{N}_i$ not having a dual counterpart in the flow-path, which would render the transformation power-conserving. 
+
+\subsection{Previous passivation approach}
+\begin{figure}[tb]
+    \centering
+    % \includegraphics[width=0.45\textwidth]{figures/RAL/Dietrich.eps}
+    \includegraphics[width=\linewidth]{figures/RAL/Dietrich.eps}
+    \caption{Scheme from \cite{dietrichPassivationProjectionBasedNull2016} and \cite{dietrichPassiveHierarchicalImpedance2017} for task $i=2, \dots, r$ to maintain the passivity when the energy tank is empty. A dual counterpart to the null-space projector $\bm{N}_i$ is introduced in the flow-path, which maintains the passivity of the system, but alters the task velocity $\dot{\hat{\bm{x}}}_i$ apparent to the controller.}
+    \label{fig:previous}
+\end{figure}
+To restore the desired passivity of the system, 
+% which is necessary to ensure the Lyapunov stability of the closed-loop system during contact with passive environments,
+% To restore the desired passivity of the system, which ensures the Lyapunov stability of the closed-loop system even during contact with a passive environment, 
+\cite{dietrichPassivationProjectionBasedNull2016} and \cite{dietrichPassiveHierarchicalImpedance2017} introduce an energy tank to the system. This virtual reservoir of energy is then used to compensate for any activity introduced by the null-space projections, leaving the system passive.
+% \todo[inline]{Too informal? Too introduction-section-like?}
+    
+To not mask any potentially dangerous active behavior, the tank is usually not filled with large amounts of energy, meaning it can become empty. If this happens, the energy tank can no longer be used to passivate the system, and %the control scheme must therefore be modified if the passivity is to be preserved.
+the tank and the controller are therefore designed such that passivity is preserved even if the tank is empty. However, this comes at a price.
+% Therefore, the transposed null-space operator, $\bm{N}_i^T$, is introduced in the flow-path relating $\dot{\bm{q}}$ to $\dot{\bm{x}}$, see \cref{fig:previous}.
+
+As mentioned in \cref{ssec:classical_controller}, the non-passivity of the classical hierarchical controller comes as a result of there not being a dual to the null-space projector $\bm{N}_i$ in the flow-path relating $\dot{\bm{q}}$ to $\dot{\bm{x}}$, so the dual is now introduced when the energy tank becomes empty, see \cref{fig:previous}. 
+This maintains both the passivity and the strict hierarchy of the system, but alters the task velocity $\dot{\hat{\bm{x}}}_i$ apparent to the controller, such that the task force \eqref{eq:F_i} is given by $\bm{F}_i(\hat{\bm{x}}_i,\dot{\hat{\bm{x}}}_i)$.
+
+% The energy tanks are, however, not filled with large amounts of energy, as that could lead to the masking of potentially dangerous active behavior. So, to maintain the passivity, the transposed null-space projector, $\bm{N}_i^T$, is introduced in the flow-path relating $\dot{\bm{q}}$ to $\dot{\bm{x}}$ when the energy tank(s) are emptied, see \cref{fig:previous}. This maintains both the passivity and the strict hierarchy of the system, but alters the task velocity $\dot{\hat{\bm{x}}}_i$ apparent to the controller.
+
+As the joint velocities can be found by $\dot{\bm{q}}=\sum_{j=1}^{r} \bm{Z}_j^T\bm{v}_j$ \cite{ottPrioritizedMultiTaskCompliance2015}, the task velocities can be expressed as \cite{dietrichPassiveHierarchicalImpedance2017}
+\begin{equation} \label{eq:xdot_kappa_w}
+    \dot{\bm{x}}_i= \underbrace{\bm{J}_i\sum_{j=1}^{i-1}\bm{Z}_j^T\bm{v}_j}_{\bm{w}_i} +
+    \underbrace{\vphantom{\sum_{j=1}^{i-1}}
+        \bm{J}_i\bm{Z}_i^T\bm{v}_i}_{\bm{\kappa}_i},
+\end{equation}
+by using \eqref{eq:xdot_qdot} and the property $\bm{J}_i\bm{Z}^T_j = \bm{0}$ $\forall j>i$. 
+Here, $\bm{w}_i$ is the component of the task velocity stemming from higher-prioritized tasks' motions, while $\bm{\kappa}_i$ is the component stemming from the current task level.
+The introduction of $\bm{N}_i^T$ in the flow-path cancels out $\bm{w}_i$, and the task velocity apparent to the controller, $\dot{\hat{\bm{x}}}_i$, can thus be written as
+\begin{equation} \label{eq:x_hat_dot}
+    \dot{\hat{\bm{x}}}_i = \begin{cases}
+        \bm{w}_i + \bm{\kappa}_i + \bm{K}_{P,i}(\bm{x}_i - \hat{\bm{x}}_i) & E_{t} \geq \underline{E}_t \\
+        \bm{\kappa}_i & \text{else}.
+    \end{cases}
+\end{equation}
+Here, $E_t$ is the energy in the energy tank, $\underline{E}_t$ is the lower limit of the energy tank and $\bm{K}_{P,i}(\bm{x}_i - \hat{\bm{x}}_i)$ is a drift compensation term.
+Thus, when the tank is empty, the controller will no longer yield a control input based on the full task velocity $\dot{\bm{x}}_i$, but based only on the part stemming from the task itself, $\bm{\kappa}_i$. 
+% As the task available to the controller, $\hat{\bm{x}}_i$, is simply found through numerically integrating $\dot{\hat{\bm{x}}}_i$, $\hat{\bm{x}}_i$ will differ from $\bm{x}_i$ as well. This leads to reduced steady-state accuracy of the lower-prioritized tasks compared to that yielded by the classical hierarchical impedance controller, \cref{eq:task_priority_control_law,eq:tau_i_non-passive,eq:F_i} \cite{dietrichPassiveHierarchicalImpedance2017}.
+% \newpage
+
+The task available to the controller, $\hat{\bm{x}}_i$, is found through numerically integrating $\dot{\hat{\bm{x}}}_i$. Therefore, modifying the velocity signal leads to drift in $\bm{x}_i$. 
+This means that, contrary to the classical hierarchical impedance controller \cref{eq:task_priority_control_law,eq:tau_i_non-passive,eq:F_i}, the previous passivation approach \cite{dietrichPassiveHierarchicalImpedance2017} may yield a steady-state error if the energy tank becomes empty, even if all the tasks are compatible.
+
+
+
+
+
+
+\section{Approach} \label{sec:approach}
+To avoid the problems introduced by the scheme presented in \cite{dietrichPassivationProjectionBasedNull2016} and \cite{dietrichPassiveHierarchicalImpedance2017}, the proposed approach involves preserving the passivity through ceding the strict task hierarchy when the energy tank is empty. 
+% Thus, in contrast to the previous passivation approach, the controller in this work has access to the true task states and velocities, see \cref{fig:proposed_scheme}, and a better steady-state performance may be achieved.
+Instead of modifying the flow, we modify the effort signal, i.e. we modify the force instead of the velocity, see \cref{fig:proposed_scheme}. Thus, the controller has access to the true task states and velocities, and the drift causing the steady-state errors is therefore eliminated.
+
+In this section we will first present the proposed control law and the energy tank design, before the (output strict) passivity of the closed-loop system will be proven.
+
+% \todo[inline]{Restructure this section! It is not very readable in its current form.}
+% Move energy tank-section first? And put the definition of alpha there as well!
+
+\begin{figure}[tb]
+    \centering
+    % \includegraphics[width=0.45\textwidth]{figures/RAL/Mine.eps}
+    \includegraphics[width=\linewidth]{figures/RAL/Mine.eps}
+    \caption{Proposed scheme for task $i=2, \dots, r$ to maintain the passivity when the energy tank is empty. To preserve the passivity, the null-space projector $\bm{N}_i$ is removed, meaning that the task hierarchy is abandoned. In contrast to the scheme from \cite{dietrichPassivationProjectionBasedNull2016} and \cite{dietrichPassiveHierarchicalImpedance2017}, though, the task velocity $\dot{\bm{x}}_i$ remains unaltered.}
+    \label{fig:proposed_scheme}
+\end{figure}
+
+\subsection{Control law}
+The control law is also here chosen to be of the form \eqref{eq:task_priority_control_law}. In this work, however, we 
+% constrict the damping matrix $\bm{D}_i$ of \eqref{eq:F_i} to be symmetric, and 
+split each task-related part of the control input, $\bm{\tau}_{i}$, into a passive and potentially non-passive part:
+\begin{subequations} \label{eq:tau_i_full}
+    \begin{align}
+        \bm{\tau}        &= \bm{g}+\bm{\tau}_{\mu}+\sum_{i=1}^r \bm{\tau}_{i} \\
+        \bm{\tau}_{i}    &= \bm{\tau}_{p,i} + \bm{\tau}_{np,i} \label{eq:tau_i} \\
+        \bm{\tau_}{p,i}  &= \bm{J}_{i}^T\bm{F}_{i} \label{eq:tau_pi} \\
+        \bm{\tau_}{np,i} & = \alpha (\bm{N}_{i}-\bm{I}) \bm{J}_{i}^T\bm{F}_{i}. \label{eq:tau_npi}
+    \end{align}
+\end{subequations}
+Here, $\bm{\tau_}{p,i}$ is the non-null-space-projected part of the control input that ensures passivity even without the use of an energy tank, as shown in \cref{fig:proposed_scheme}. The second summand, $\bm{\tau}_{np,i}$, on the other hand, does not ensure passivity on its own, and therefore includes a valve parameter, $\alpha$, which determines if the controller can use the energy from the energy tank. When the valve parameter $\alpha=1$, $\bm{\tau}_{np,i}$ cancels $\bm{\tau}_{p,i}$ and replaces it with the null-space projected control input from the classical hierarchical impedance controller \eqref{eq:tau_i_non-passive}. When $\alpha = 0$, on the other hand, $\bm{\tau}_i = \bm{\tau}_{p,i}$, which means that the strict hierarchy is lost, but the passivity is ensured. 
+
+% To avoid discontinuous switching between %the classical hierarchical impedance controller 
+% \eqref{eq:tau_i_non-passive} and an inherently passive, non-hierarchical controller with $\bm{\tau}_i=\bm{J}_i^T\bm{F}_i$ 
+% that could cause unnecessary wear on the robot due to sudden changes in the commanded acceleration, the valve parameter $\alpha$ is defined with a smooth transition between zero and one \cite{shahriariValvebasedVirtualEnergy2018}:
+
+The valve parameter $\alpha$ is defined with a smooth transition between zero and one as in \cite{shahriariValvebasedVirtualEnergy2018} to avoid a discontinuous control law that could cause unnecessary wear on the robot due to sudden changes in the commanded acceleration:
+% The valve parameter is defined as
+\begin{equation} \label{eq:alpha_i}
+    \alpha = \begin{cases}
+        0 & E_{t}\leq \underline{E}_{t} %\cap \dot{\bm{q}}^T \bm{N}_i\bm{J}_i^T\bm{F}_i \geq 0
+        \\
+        \frac{1}{2}\left( 1-\cos\left( \frac{E_{t}-\underline{E}_{t}}{\delta_{\alpha}} \pi \right) \right) & \underline{E}_{t} < E_{t}<\underline{E}_{t} + \delta_{\alpha}  \\
+        1  & \text{otherwise}.
+        \end{cases}
+\end{equation}
+% Here, $E_t \in \mathbb{R}$ is the energy in the energy tank, $\underline{E}_{t}>0$ is the lower energy limit of the tank, and $\delta_{\alpha} \geq 0$ is a parameter deciding how smooth the transition between the valve being fully open and fully closed is going to be.
+% The valve ensures that only the passive, non-projected part, $\bm{\tau}_{p,i}$, is used when the energy tank is empty and no longer can be used to compensate for any potentially passivity-violating activity induced by $\bm{\tau}_i$.
+%  Choosing a smaller value for $\delta_\alpha$ means that the behavior of the proposed controller will be identical to that of the classical controller \cref{eq:task_priority_control_law,eq:tau_i_non-passive,eq:F_i} for a longer time, given that the initial energy in the energy tank is chosen to be larger than its minimum, $E_{t,0} > \underline{E}_t$. The initial energy of the tank may be chosen as the \textit{task energy}, $E_T$, the estimated minimal energy needed to perform the tasks \cite{schindlbeckUnifiedPassivitybasedCartesian2015}, added to the tank minimum, $E_{t,0} = E_T + \underline{E}_t$. The downside to choosing a smaller $\delta_\alpha$ is that the switching becomes more abrupt, leading to a potentially large change in the commanded acceleration.
+Here, $E_t \in \mathbb{R}$ is the energy in the tank, $\underline{E}_t > 0$ its lower limit, and $\delta_\alpha \geq 0$ a parameter controlling the smoothness of the valve transition. The valve ensures that only the passive, non-projected component, $\bm{\tau}_{p,i}$, is applied when the tank is depleted and can no longer compensate for potential passivity violations from $\bm{\tau}_i$.
+
+A smaller $\delta_\alpha$ causes the controller to behave like the classical controller \cref{eq:task_priority_control_law,eq:tau_i_non-passive,eq:F_i} for a longer time, assuming the initial tank energy $E_{t,0} > \underline{E}_t$. The same holds for a larger $E_{t,0}$. The initial energy is typically set as the \textit{task energy} $E_T$, which is the estimated minimum energy to achieve the task, plus the tank minimum, $E_{t,0} = E_T + \underline{E}_t$ \cite{schindlbeckUnifiedPassivitybasedCartesian2015}. The trade-off for choosing a small $\delta_\alpha$ is a more abrupt switching, potentially causing large changes in the commanded acceleration.
+
+Note that, similar to \cite{dietrichPassiveHierarchicalImpedance2017} and \cite{shahriariValvebasedVirtualEnergy2018}, one can also apply a different valve parameter $\alpha_i$ for each task. These parameters are dependent on the power that each specific task drains from the tank, such that a task may be executed as desired even if the energy tank is empty, given that the specific task in question does not require energy from the tank to preserve passivity. This is recommended in practice, as it may yield increased performance, but is not included here to better highlight the differences between the different methods during the simulations and experiments in \cref{sec:sim+exp}.
+
+% Note that it is also possible to do as in [13], where there are
+% individual valves αi for each task that are dependent on the
+% power that each specific task drains from the tank. That way,
+% a task may be executed as desired even if the energy tank is
+% empty, given that the specific task in question does not require
+% energy from the tank to preserve passivity. This is recom-
+% mended in practice, as it may yield increased performance, but
+% is not included here to better highlight the difference between
+% the different methods during the simulations and experiments
+% in Section IV.
+
+
+\subsection{Energy tank design}
+We design the energy tank such that the dynamics of the tank is given by
+\begin{equation} \label{eq:energy_tank_dyn}
+    \dot{E}_{t} = \gamma\sum_{i=1}^r \left(\beta_{i} \dot{\bm{x}}_{i}^T\bm{D}_{i}\dot{\bm{x}}_{i} - \dot{\bm{q}}^T\bm{\tau}_{np,i} \right),
+\end{equation}
+where
+\begin{equation} \label{eq:gamma}
+    \gamma = \begin{cases}
+        0  & E_{t}\geq \bar{E}_{t} \cap \sum_{i=1}^r(\beta_{i}\dot{\bm{x}}_{i}^T\bm{D}_{i}\dot{\bm{x}}_{i} - \dot{\bm{q}}^T\bm{\tau}_{np,i})>0 \\
+        1 & \text{otherwise},
+        \end{cases}
+\end{equation}
+% is a slightly simplified version of the overflow valve in \cite{shahriariValvebasedVirtualEnergy2018} 
+is the overflow valve from \cite{dietrichPassiveHierarchicalImpedance2017}, rewritten for a single energy tank.
+This valve makes sure that the energy level of the tank does not exceed some predetermined maximum level $\bar{E}_{t}>0$.
+The user-specified $\beta_i\in [0,1)$ is a damping refill coefficient determining how much of the energy dissipated by the control effort for task $i$ is used to refill the energy tank. The energy $E_t$ in the tank is given by \cite{stramigioliEnergyAwareRobotics2015}
+\begin{equation}
+    E_t = \frac{1}{2} s^{2},
+\end{equation}
+meaning that $\dot{E}_t = s\dot{s}$. The tank state $s$ does not represent a physical quantity, but is merely a measure of the tank energy, with dynamics that can be chosen as part of the control design. To get the desired tank dynamics \eqref{eq:energy_tank_dyn}, we therefore choose $\dot{s}$ accordingly:
+% , while making sure that the total energy leaving the energy tank is equal to the energy provided to the controller (by the energy tank). This is done through the design of a
+% % Dirac structure.
+% skew-symmetric matrix mapping the flows and efforts related to the energy tank.
+% % \todo[inline]{Add reference?}
+
+% To define this matrix relating the energy tank to the control effort, we first define $\bm{D}_{\beta} := \operatorname{blkdiag}(\beta_{i}\bm{D}_{i})$ 
+% % $\bm{u}_{\alpha} := [\alpha_{1}\bm{u}_{1}^T, \dots, \alpha_{r}\bm{u}_{r}^T]^T$ 
+% % $\bm{u}_{\alpha} := \alpha[\bm{u}_{1}^T, \dots, \bm{u}_{r}^T]^T$ 
+% and $\dot{\bm{q}}_{\times r} := \bm{1}_{r} \otimes \dot{\bm{q}}$, where $\otimes$ denotes the Kronecker product and $\bm{1}_r \in \mathbb{R}^r$ is the column vector of $r$ ones. With $\bm{F}_{d}^\mathrm{aug}:=[\bm{F}_{d,1}^T, \dots, \bm{F}_{d,r}^T]^T$, where $\bm{F}_{d,i} = \beta_i \bm{D}_i\dot{\bm{x}}_i$, and $\bm{\tau}_{np}^{\mathrm{aug}}:=[\bm{\tau}_{np,1}^T, \dots,\bm{\tau}_{np,r}^T]^T$, the mapping of flows and efforts related to the energy tank with dynamics as in \eqref{eq:energy_tank_dyn} can be written as % mapping? relationship? Remove Dirac in any case
+% \begin{equation} \label{eq:Dirac}
+% \renewcommand\arraystretch{1.3} % To avoid overlap of the fractions on different rows
+%     \begin{bmatrix}
+%         \bm{F}_{d}^\mathrm{aug} \\
+%         \bm{\tau}_{np}^{\rm aug} \\
+%         \dot{s}
+%         \end{bmatrix}
+%         =
+%         \begin{bmatrix}
+%         \bm{0} & \bm{0} & \frac{1}{s} \bm{D}_{\beta}\dot{\bm{x}}  \\
+%         \bm{0} & \bm{0} & \frac{1}{s}\bm{\tau}_{np}^\mathrm{aug}   \\
+%         -\frac{1}{s} (\bm{D}_{\beta}\dot{\bm{x}})^T  & -\frac{1}{s}(\bm{\tau}_{np}^\mathrm{aug})^T  & 0
+%         \end{bmatrix}
+%         \begin{bmatrix}
+%         -\gamma \dot{\bm{x}} \\
+%         \gamma \dot{\bm{q}}_{\times r}  \\
+%         s
+%         \end{bmatrix}.
+% \end{equation}
+% By inserting the expression for $\dot{s}$ from \eqref{eq:Dirac} into the definition of $\dot{E}_t$, the desired energy tank dynamics, \eqref{eq:energy_tank_dyn}, are achieved.
+\begin{equation} \label{eq:s_dot}
+    \dot{s} = \frac{\gamma}{s} \sum_{i=1}^r \left(\beta_{i} \dot{\bm{x}}_{i}^T\bm{D}_{i}\dot{\bm{x}}_{i} - \dot{\bm{q}}^T\bm{\tau}_{np,i} \right),
+\end{equation}
+and achieve the desired energy tank dynamics \eqref{eq:energy_tank_dyn}.
+Note that division by the tank state $s$ is not a problem, as the state is bounded from below by $\sqrt{2\underline{E}_t}>0$ through the valve \eqref{eq:alpha_i}. This is the reason that the tank's energy is lower-bounded by ${\underline{E}_t > 0}$.
+
+\subsection{Passivity analysis} \label{ssec:passivity_analysis}
+In this subsection, we will provide a proof of the output strict passivity of the closed-loop system, \eqref{eq:hierarchical_dynamics}, \eqref{eq:tau_i_full}, \eqref{eq:s_dot}, with respect to the input $\bm{\tau}^\mathrm{ext}$ and the output $\dot{\bm{q}}$, and thus also its finite-gain $\mathcal{L}_2$ stability.
+As in \cite{dietrichPassiveHierarchicalImpedance2017}, the passivity analysis will consist of two major steps. In the first step, a storage function related to the closed-loop system's potential energy is used, before the system's total internal energy is considered in the second step.
+
+We first define a potential energy-like storage function for the closed-loop system
+\begin{equation}
+    S_{\mathrm{pot}} = \frac{1}{2}\sum_{i=1}^r\tilde{\bm{x}}_{i}^T\bm{K}_{i}\tilde{\bm{x}}_{i} + E_{t}
+\end{equation}
+and its time derivative
+\begin{equation} \label{eq:S_pot_dot}
+    \dot{S}_{\mathrm{pot}} = \sum_{i=1}^r \dot{\bm{x}}_{i}^T\bm{K}_{i}\tilde{\bm{x}}_{i} + \dot{E}_{t}.
+\end{equation}
+An alternative expression for $\dot{\bm{x}}_{i}^T\bm{K}_{i}\tilde{\bm{x}}_{i}$ is then found, relating it to $\dot{\bm{q}}^T\bm{\tau}_i$. We start by finding an alternative expression for $\dot{\bm{q}}^T\bm{\tau}_{np,i}$:
+\begin{equation}\label{eq:qdot_tauNP} 
+    \begin{aligned}
+        \dot{\bm{q}}^T\bm{\tau}_{np,i}  %& = \alpha_{i}\dot{\bm{q}}^T\bm{u}_{i} \\
+         & = \alpha\dot{\bm{q}}^T(\bm{N}_{i}-\bm{I}) \bm{J}_{i}^T\bm{F}_{i} \\
+        %  & =\alpha_{i}\dot{\bm{q}}^T\bar{\bm{J}}_{i}^T\bm{Z}_{i}\bm{J}_{i}^T\bm{F}_{i} - \alpha_{i}\dot{\bm{q}}^T\bm{J}_{i}^T\bm{F}_{i} \\
+         & =\alpha\bm{v}_{i}^T\bm{Z}_{i}\bm{J}_{i}^T\bm{F}_{i} - \alpha\dot{\bm{x}}_{i}^T\bm{F}_{i} \\
+        %  & = \alpha_{i}(\bm{\kappa}_{i}-\dot{\bm{x}}_{i})^T\bm{F}_{i} \\
+         & = -\alpha\bm{w}_{i}^T\bm{F}_{i},
+    \end{aligned}
+\end{equation}
+where \eqref{eq:xdot_qdot}, \eqref{eq:v}, \eqref{eq:NandZ} and \eqref{eq:xdot_kappa_w} have been used. 
+% Using this relation, \eqref{eq:qdot_tauNP}, along with \eqref{eq:xdot_qdot}, \eqref{eq:F_i}, \eqref{eq:tau_i}, and the definition of $\bm{\tau}_{p,i}$, we can find an expression for $\dot{\bm{x}}_{i}^T\bm{K}_{i}\tilde{\bm{x}}_{i}$ using $\dot{\bm{q}}^T\bm{\tau}_i$ as follows:
+% \begin{subequations} \label{eq:xKx}
+%     \begin{align}
+%         \dot{\bm{q}}^T\bm{\tau}_{i} &= \dot{\bm{q}}^T\bm{\tau}_{p,i} + \dot{\bm{q}}^T\bm{\tau}_{np,i} \\
+%         %  & = \dot{\bm{q}}^T\bm{J}_{i}^T\bm{F}_{i}-\alpha_{i}\bm{w}_{i}^T\bm{F}_{i} \\
+%          & = \dot{\bm{x}}_{i}^T\bm{F}_{i}-\alpha\bm{w}_{i}^T\bm{F}_{i}\\
+%         %  & = -\dot{\bm{x}}_{i}^T\bm{K}_{i}\tilde{\bm{x}}_{i} - \dot{\bm{x}}_{i}^T\bm{D}_{i}\dot{\bm{x}}_{i} - \alpha_{i}\bm{w}_{i}^T\bm{F}_{i} \\
+%         \dot{\bm{x}}_{i}^T\bm{K}_{i}\tilde{\bm{x}}_{i}  & = -\dot{\bm{q}}^T\bm{\tau}_{i} - \dot{\bm{x}}_{i}^T\bm{D}_{i}\dot{\bm{x}}_{i} - \alpha\bm{w}_{i}^T\bm{F}_{i}.
+%         \end{align}
+% \end{subequations}
+Using this relation, \eqref{eq:qdot_tauNP}, along with \cref{eq:xdot_qdot,eq:tau_i,eq:tau_pi}, we find an expression for $\dot{\bm{q}}^T\bm{\tau}_i$:
+\begin{equation} \label{eq:q_dot_tau_i}
+    \begin{aligned}
+        \dot{\bm{q}}^T\bm{\tau}_{i} &= \dot{\bm{q}}^T\bm{\tau}_{p,i} + \dot{\bm{q}}^T\bm{\tau}_{np,i} \\
+        & = \dot{\bm{x}}_{i}^T\bm{F}_{i}-\alpha\bm{w}_{i}^T\bm{F}_{i}.
+    \end{aligned}
+\end{equation}
+Then, the alternative expression for $\dot{\bm{x}}_{i}^T\bm{K}_{i}\tilde{\bm{x}}_{i}$ can finally be found through \eqref{eq:F_i} and \eqref{eq:q_dot_tau_i}:
+\begin{equation} \label{eq:xKx}
+    \dot{\bm{x}}_{i}^T\bm{K}_{i}\tilde{\bm{x}}_{i}  = -\dot{\bm{q}}^T\bm{\tau}_{i} - \dot{\bm{x}}_{i}^T\bm{D}_{i}\dot{\bm{x}}_{i} - \alpha\bm{w}_{i}^T\bm{F}_{i}.
+\end{equation}
+
+We can then show output strict passivity of \eqref{eq:hierarchical_dynamics}, \eqref{eq:tau_i_full}, \eqref{eq:s_dot}, with respect to $\left( \dot{\bm{q}},-\sum_{i=1}^r\bm{\tau}_{i} \right)$ using $S_{\mathrm{pot}}$ as a storage function by extending \eqref{eq:S_pot_dot}, and using \eqref{eq:xdot_qdot}, \eqref{eq:sing_val_bound}, \eqref{eq:energy_tank_dyn}, \eqref{eq:qdot_tauNP} and \eqref{eq:xKx}:
+%\begin{align}\label{eq:S_pot}
+%    \dot{S}_{\mathrm{pot}}  & = \sum_{i=1}^r \dot{\bm{x}}_{i}^T\bm{K}_{i}\tilde{\bm{x}}_{i} + \dot{E}_{t} \nonumber \\
+%    &
+%    \begin{aligned}
+%        = \sum_{i=1}^r (-\dot{\bm{q}}^T\bm{\tau}_{i} - \dot{\bm{x}}_{i}^T\bm{D}_{i}\dot{\bm{x}}_{i} - \alpha\bm{w}_{i}^T\bm{F}_{i}) \\
+%        + \gamma\sum_{i=1}^r \left( \beta_{i} \dot{\bm{x}}_{i}^T\bm{D}_{i}\dot{\bm{x}}_{i} - \dot{\bm{q}}^T\bm{\tau}_{np,i} \right)
+%    \end{aligned}
+%      \\
+%     & = -\dot{\bm{q}}^T\sum_{i=1}^r \bm{\tau_}{i} -\sum_{i=1}^r  \begin{cases}
+%     (1-\beta_{i})\dot{\bm{x}}_{i}^T\bm{D}_{i}\dot{\bm{x}}_{i}  & \text{if } \gamma = 1 \\
+%     (\dot{\bm{x}}_{i}^T\bm{D}_{i}\dot{\bm{x}}_{i} +\alpha\bm{w}_{i}^T\bm{F}_{i}) & \text{if } \gamma = 0
+%    \end{cases} \nonumber \\
+%    & \leq -\dot{\bm{q}}^T\sum_{i=1}^r \bm{\tau_}{i} -\sum_{i=1}^r  (1-\beta_{i})\dot{\bm{x}}_{i}^T\bm{D}_{i}\dot{\bm{x}}_{i}. \nonumber 
+     %    & = -\dot{\bm{q}}^T\sum_{i=1}^r \left(\bm{\tau_}{i} -\bm{\rho}_i(\tilde{\bm{x}}, \dot{\bm{q}})\right) \nonumber \\ 
+     % & \leq -\dot{\bm{q}}^T\sum_{i=1}^r \bm{\tau}_{i}. \nonumber
+%\end{align}
+\begin{equation} \label{eq:S_pot}
+    \begin{aligned}
+        \dot{S}_{\mathrm{pot}}  & = \sum_{i=1}^r \dot{\bm{x}}_{i}^T\bm{K}_{i}\tilde{\bm{x}}_{i} + \dot{E}_{t} \\
+        &
+        \begin{aligned}
+            = \sum_{i=1}^r (-\dot{\bm{q}}^T\bm{\tau}_{i} - \dot{\bm{x}}_{i}^T\bm{D}_{i}\dot{\bm{x}}_{i} - \alpha\bm{w}_{i}^T\bm{F}_{i}) \\
+            + \gamma\sum_{i=1}^r \left( \beta_{i} \dot{\bm{x}}_{i}^T\bm{D}_{i}\dot{\bm{x}}_{i} - \dot{\bm{q}}^T\bm{\tau}_{np,i} \right) 
+        \end{aligned} 
+          \\
+        &
+        \begin{aligned}
+            = \sum_{i=1}^r & \left(-\dot{\bm{q}}^T\bm{\tau}_{i} - (1-\beta_i) \dot{\bm{x}}_{i}^T\bm{D}_{i}\dot{\bm{x}}_{i} \right)\\
+            &- (1-\gamma) \sum_{i=1}^r\left(\beta_i \dot{\bm{x}}_{i}^T\bm{D}_{i}\dot{\bm{x}}_{i} + \alpha\bm{w}_{i}^T\bm{F}_{i}\right) 
+        \end{aligned} \\
+        & \leq -\dot{\bm{q}}^T\sum_{i=1}^r \bm{\tau}_{i} - \sum_{i=1}^r (1-\beta_i) \dot{\bm{x}}_{i}^T\bm{D}_{i}\dot{\bm{x}}_{i} \\
+        % & \leq -\dot{\bm{q}}^T\sum_{i=1}^r \bm{\tau}_{i} - \dot{\bm{q}}^T\underbrace{\sum_{i=1}^r (1-\beta_i)\lambda_\mathrm{min}(\bm{D}_i) \underline{\sigma}_i^2 \dot{\bm{q}}}_{\bm{\rho}(\dot{\bm{q}})},
+        & \leq -\dot{\bm{q}}^T\sum_{i=1}^r \bm{\tau}_{i} - \dot{\bm{q}}^T\underbrace{\underline{\sigma}^2 \lambda_\mathrm{min}(\bm{D}_{1-\beta}) \dot{\bm{q}}}_{\bm{\rho}(\dot{\bm{q}})},
+    \end{aligned}
+\end{equation}
+where $\bm{D}_{1-\beta} := \operatorname{blkdiag}\left((1-\beta_i)\bm{D}_i\right)$ and $\lambda_\mathrm{min}(\bm{D}_{1-\beta})$ is its lowest eigenvalue. Here, $\dot{\bm{q}}^T\bm{\rho}(\dot{\bm{q}})>0$ $\forall \dot{\bm{q}} \neq \bm{0}$, due to  $\beta_i \in [0,1)$ and $\bm{D}_i>0$ $\forall i$, and $\underline{\sigma} \neq 0$, see \eqref{eq:sing_val_bound}.
+Note that the first inequality of \eqref{eq:S_pot} holds, as we in \eqref{eq:gamma} defined $\gamma$ such that $\gamma=0 \implies \sum_{i=1}^r (\beta_i\dot{\bm{x}}_{i}^T\bm{D}_{i}\dot{\bm{x}}_{i} +\alpha\bm{w}_{i}^T\bm{F}_{i}) > 0$.
+The second inequality holds as well, because $\lambda_\mathrm{min}(\bm{A})\bm{a}^T\bm{a} \leq \bm{a}^T\bm{Aa}$ for positive semi-definite matrices $\bm{A} = \bm{A}^T$.
+
+% We note that the system is dissipative with rate
+% \begin{equation}
+%     \begin{aligned}
+%         \bm{\rho}'(\tilde{\bm{x}}, \dot{\bm{q}})
+%         &= \sum_{i=1}^r \bm{\rho}_i'(\tilde{\bm{x}}, \dot{\bm{q}}) \\
+%         &= \sum_{i=1}^r  \begin{cases}
+%             (1-\beta_{i})\dot{\bm{x}}_{i}^T\bm{D}_{i}\dot{\bm{x}}_{i}  & \text{if } \gamma = 1 \\
+%             (\dot{\bm{x}}_{i}^T\bm{D}_{i}\dot{\bm{x}}_{i} +\alpha\bm{w}_{i}^T\bm{F}_{i}) & \text{if } \gamma = 0
+%            \end{cases} \\
+%         % &= \sum_{i=1}^r  \begin{cases}
+%         %     (1-\beta_{i})\dot{\bm{q}}^T \bm{J}_{i}^T \bm{D}_{i} \bm{J}_{i} \dot{\bm{q}}  & \text{if } \gamma = 1 \\
+%         %     (\dot{\bm{q}}^T \bm{J}_{i}^T \bm{D}_{i} \bm{J}_{i} \dot{\bm{q}} - \dot{\bm{q}}^T \bm{\tau}_{np, i}) & \text{if } \gamma = 0
+%         %    \end{cases} \\
+%         &= \dot{\bm{q}}^T \sum_{i=1}^r  \begin{cases}
+%             (1-\beta_{i}) \bm{J}_{i}(\bm{q})^T \bm{D}_{i} \bm{J}_{i}(\bm{q}) \dot{\bm{q}}  & \text{if } \gamma = 1 \\
+%             ( \bm{J}_{i}(\bm{q})^T \bm{D}_{i} \bm{J}_{i}(\bm{q}) \dot{\bm{q}} - \bm{\tau}_{np, i}) & \text{if } \gamma = 0
+%            \end{cases} \\
+%         &= \dot{\bm{q}}^T \bm{\rho}(\dot{\bm{q}}, \tilde{\bm{x}}) > 0 \quad \forall \dot{\bm{q}} \neq \bm{0}.
+%     \end{aligned}
+% \end{equation}
+% Here, $\bm{\rho}$ is also a function of the manipulator joint angles, as these decide the task Jacobians $\bm{J}_i(\bm{q})$. However, given the assumptions of a singularity-free workspace with compatible tasks, the task Jacobians are bounded mappings from joint to task velocities \cite{wampler1987,zergeroglu2000},  and thus do not affect the sign of the dissipativity, only it's magnitude. 
+
+
+Using a full internal energy-like storage function, we will now show the desired passivity property of the closed-loop system, given by \eqref{eq:hierarchical_dynamics} subject to the control input \eqref{eq:tau_i_full} and the energy tank state dynamics \eqref{eq:s_dot}, with respect to $(\dot{\bm{q}},\bm{\tau}^\mathrm{ext})$.
+We first define the storage function
+\begin{equation} \label{eq:storage_function}
+    S = S_{\mathrm{pot}} + \frac{1}{2}\bm{v}^T\bm{\Lambda} \bm{v}.
+\end{equation}
+Then, by using the hierarchical dynamics \eqref{eq:hierarchical_dynamics}, along with \eqref{eq:v}, \eqref{eq:S_pot} and that $\dot{\bm{\Lambda}}=\bm{\mu}+\bm{\mu}^T$, we can show that the time derivative of \eqref{eq:storage_function} has the desired relation to $\dot{\bm{q}}^T \bm{\tau}^\mathrm{ext}$:
+% the desired passivity property can be shown:
+\begin{equation} \label{eq:S_dot}
+    \begin{aligned}
+        \dot{S}  & = \dot{S}_{\mathrm{pot}} + \frac{1}{2}\bm{v}^T\dot{\bm{\Lambda}}\bm{v} + \bm{v}^T\bm{\Lambda} \dot{\bm{v}} \\
+        %  &
+        %  \begin{aligned}
+        %     = \dot{S}_{\mathrm{pot}} + \frac{1}{2}\bm{v}^T\dot{\bm{\Lambda}}\bm{v} - \bm{v}^T\operatorname{blkdiag}(\bm{\mu})\bm{v} \\
+        %     + \bm{v}^T\bar{\bm{J}}^{-T}\left( \sum_{i=1}^r\bm{\tau}_{i} + \bm{\tau}^\mathrm{ext} \right)
+        %  \end{aligned}
+        % \\
+        %  & = \dot{S}_{\mathrm{pot}} + \bm{v}^T\bar{\bm{J}}^{-T}\sum_{i=1}^r\bm{\tau_}{i} + \bm{v}^T\bar{\bm{J}}^{-T}\bm{\tau}^\mathrm{ext} \\
+         & = \dot{S}_{\mathrm{pot}} + \dot{\bm{q}}^T \sum_{i=1}^r \bm{\tau}_{i} + \dot{\bm{q}}^T \bm{\tau}^\mathrm{ext} \\
+         & \leq - \dot{\bm{q}}^T \sum_{i=1}^r \bm{\tau_}{i} + \dot{\bm{q}}^T \sum_{i=1}^r \bm{\tau_}{i} + \dot{\bm{q}}^T\bm{\tau}^\mathrm{ext} 
+         -\dot{\bm{q}}^T\bm{\rho}(\dot{\bm{q}})\\
+         & = \dot{\bm{q}}^T \bm{\tau}^\mathrm{ext}
+         - \dot{\bm{q}}^T\bm{\rho}(\dot{\bm{q}}).
+        \end{aligned}
+\end{equation}
+% Thus, the closed-loop system is shown to be output strictly passive with respect to $(\dot{\bm{q}},\bm{\tau}^\mathrm{ext})$, and, as the system is proven passive, the stability of the equilibrium point $(\tilde{\bm{x}}, \dot{\bm{q}}) = (\bm{0},\bm{0})$ is proven as well, even if the system is in contact with a passive environment \cite{khalil2002nonlinear}.
+% Note that passivity is guaranteed even if the condition on the singular values of $\bm{J}$, \eqref{eq:sing_val_bound}, does not hold. This is only necessary to prove output strict passivity.
+The analysis can summarized in the following theorem and lemma:
+\begin{theorem} \label{thm:output_strict_passive}
+    The closed-loop system \eqref{eq:hierarchical_dynamics}, \eqref{eq:tau_i_full}, \eqref{eq:s_dot} is output strictly passive with respect to $(\dot{\bm{q}},\bm{\tau}^\mathrm{ext})$.
+\end{theorem}
+\begin{lemma} \label{lem:L_2_stable}
+    The closed-loop system, \eqref{eq:hierarchical_dynamics}, \eqref{eq:tau_i_full}, \eqref{eq:s_dot}, with input $\bm{\tau}^\mathrm{ext}$ and output $\dot{\bm{q}}$, is finite-gain $\mathcal{L}_2$ stable with an $\mathcal{L}_2$ gain less than or equal to %$\frac{1}{\underline{\sigma}^2 \lambda_\mathrm{min}(\bm{D}_{1-\beta})}$
+    $1/(\underline{\sigma}^2 \lambda_\mathrm{min}(\bm{D}_{1-\beta}))$
+    . 
+\end{lemma}
+% \begin{lemma}\label{lem:0-input_stable}
+%     The equilibrium point $(\tilde{\bm{x}}, \dot{\bm{q}},s) = (\bm{0},\bm{0},0)$ of the closed-loop system, \eqref{eq:hierarchical_dynamics}, \eqref{eq:tau_i_full}, \eqref{eq:s_dot}, is Lyapunov stable if $\bm{\tau}^\mathrm{ext}=\bm{0}$.
+% \end{lemma}
+
+% Note that \cref{lem:L_2_stable,lem:0-input_stable} follow directly from \cref{thm:output_strict_passive} using \cite[Lem.~6.5 \& 6.6]{khalil2002nonlinear},
+% % Note that 
+% and that the passivity of the closed-loop system is guaranteed, meaning \cref{lem:0-input_stable} still holds, even if the condition on the singular values of $\bm{J}$, \eqref{eq:sing_val_bound}, does not hold. This condition is only necessary to prove output strict passivity.
+
+Note that \cref{lem:L_2_stable} follows directly from \cref{thm:output_strict_passive} and \eqref{eq:S_dot} using \cite[Lem.~6.5]{khalil2002nonlinear}.
+% while \cref{lem:0-input_stable} follows from the storage function \eqref{eq:storage_function} being positive definite and the closed-loop system being passive \cite[Lem.~6.6]{khalil2002nonlinear}. As \cref{lem:0-input_stable} only requires passivity, not output strict passivity, it holds even if the condition on the singular values of $\bm{J}$, \eqref{eq:sing_val_bound}, does not.
+
+
+\section{Simulations and Experiments}\label{sec:sim+exp}
+% To validate the proposed method and show its differences to the classical hierarchical controller, \cref{eq:task_priority_control_law,eq:tau_i_non-passive,eq:F_i}, and a previous passivation scheme \cite{dietrichPassiveHierarchicalImpedance2017}, both a simulation and an experimental study were conducted. 
+% In both cases, not only the task errors, but the value of the storage function \eqref{eq:storage_function} was monitored to verify that the passivity of the closed-loop system was maintained at all times, thus ensuring its stability even if it were to physically interact with a passive environment. 
+% % No refilling of the energy tank was allowed during either the simulation or the experimental study to highlight the differences between the approaches, that is, the damping refill coefficient of \eqref{eq:energy_tank_dyn} is given by $\beta_i = 0$ $\forall i = 1, \dots, r$.
+% In both studies, no refilling of the energy tank was allowed, that is, the damping refill coefficients of \eqref{eq:energy_tank_dyn} were set to $\beta_i = 0$ $\forall i = 1, \dots, r$. This was done to better highlight the differences between the approaches.
+
+
+To validate the proposed method and show its differences to the classical hierarchical controller, \cref{eq:task_priority_control_law,eq:tau_i_non-passive,eq:F_i}, and a previous passivation scheme \cite{dietrichPassiveHierarchicalImpedance2017}, both a simulation and an experimental study were conducted. In addition to the task errors, the value of the storage function \eqref{eq:storage_function} was monitored 
+% during these studies
+to verify that the passivity of the closed-loop systems was kept at all times.
+% This was done to ensure that the passivity of the closed-loop system was kept at all times, thus guaranteeing its stability even if it were to physically interact with a passive environment. 
+To highlight the differences between the different methods, the damping refill coefficients of \eqref{eq:energy_tank_dyn} were set to $\beta_i = 0$ $\forall i = 1, \dots, r$, such that no refilling of the energy tank was allowed.
+
+\subsection{Simulations}
+\label{sec:simulation}
+For the simulations, a fully actuated double pendulum was used, with a hierarchy consisting of two position tasks, $x_1$ and $x_2$, at its end: one along the horizontal axis and one along the horizontal axis rotated $45^\circ$ in the two-dimensional space, so that there is a clear coupling between the two tasks. The simulations were conducted in Matlab/Simulink using an ode3 solver with a fixed time step of $0.001$ s.
+The controller gains are given in \cref{tab:gains}, with $\bm{K}_{P,i}$ from \eqref{eq:x_hat_dot} set to $10$\,Hz for the previous passivation approach. The initial energy level of the energy tank, $E_{t,0}$, was set to $15$ J, and its lower limit $\underline{E}_t$ to $1$ J to showcase the behavior of the system both with and without energy left in the energy tank. The parameter $\delta_\alpha$ of \eqref{eq:alpha_i} that decides the smoothing layer was set to the small value of $0.003$ J to observe the change in the system's behavior once the tank is depleted more easily.
+
+As expected when using the proposed method, the performance of the main task, $x_1$, suffers in comparison to the other two methods during the transient phase after the energy tank becomes empty, as illustrated in \cref{fig:task1_sim}. Note, however, that there is virtually no steady-state error for either task using the proposed method. This contrasts with the significant steady-state error yielded by the previous passivation method \cite{dietrichPassiveHierarchicalImpedance2017} for the second task in the hierarchy. In fact, both the proposed method and the classical method achieve both tasks in the steady-state case, whereas the previous passivation method \cite{dietrichPassiveHierarchicalImpedance2017} only does so for the top-priority task, see \cref{fig:task1_sim,fig:task2_sim}.
+\begin{figure}[tb]
+    \centering
+    % \includegraphics[width=\linewidth]{figures/RAL/task1_sim_diff_linestyles.pdf}
+    % \includegraphics[width=\linewidth]{figures/RAL/task1_sim_all_latex.pdf}
+    \includegraphics[width=\linewidth]{figures/RAL/task1_sim_small.pdf}
+    \caption{Error $\tilde{\bm{x}}_1$ of the top-prioritized task using the three different control schemes during the simulations. \label{fig:task1_sim}}
+    \vspace{1em}
+    % \includegraphics[width=\linewidth]{figures/RAL/task2_sim.pdf}
+    % \includegraphics[width=\linewidth]{figures/RAL/task2_sim_diff_linestyles.pdf}
+    \includegraphics[width=\linewidth]{figures/RAL/task2_sim_small.pdf}
+    \caption{Error $\tilde{\bm{x}}_2$ of the null-space task using the three different control schemes during the simulations. \label{fig:task2_sim}}
+    % \vspace{-2em}
+\end{figure}
+As shown in \cref{sec:background}, though, the classical method does not guarantee passivity, and as seen in \cref{fig:sim_energy}, this causes the value of \eqref{eq:storage_function} to increase using this method, something that does not occur using the two other methods.
+
+While this is a relatively simple example, it can still help illustrate the trade-offs between the methods; one can imagine a scenario where the steady-state error in the secondary task, $x_2$, leads the system to settle in a suboptimal configuration, requiring more energy to counteract gravity or causing increased wear on the joints. Whether the trade-off between a more desirable steady-state configuration for the lower-priority tasks and a less favorable transient response in the higher-priority task, $x_1$, is acceptable, will naturally depend on the specific application.
+
+\begin{figure}
+    \centering
+    % \includegraphics[width=\linewidth]{figures/RAL/energy_sim.pdf}
+    \includegraphics[width=\linewidth]{figures/RAL/energy_sim_small.pdf}
+    \caption{
+        % Sum of the kinetic and potential energy of the system, including that in any energy tank, using the three different control schemes.
+        Value of the storage function \eqref{eq:storage_function} for the proposed approach, the previous passivation approach \cite{dietrichPassiveHierarchicalImpedance2017}, and the classical hierarchical impedance control scheme during the simulations.
+        Note that the energy of the classical method increases in the red shaded region, and that the energies of the proposed and previous method do not converge to 0 due to $\underline{E}_t = 1$ J. 
+        }
+        \vspace{-1em}
+        \label{fig:sim_energy}
+\end{figure}
+
+\begin{table}
+    \begin{center}
+        \caption{The controller gains used in the simulations and the experiments.}
+        \label{tab:gains}
+        \begin{tabular}{c|c c c c c c c c}
+            & $\bm{K}_1$ & $\bm{K}_2$ & $\bm{K}_3$ & $\bm{K}_4$ & $\bm{D}_1$ & $\bm{D}_2$ & $\bm{D}_3$ & $\bm{D}_4$  \\ \hline
+            Sim. & $750$ & $200$ & - & - & $\sqrt{\bm{K}_1}$ & $\sqrt{\bm{K}_2}$ & - & -   \\
+            Exp. & $300\bm{I}$  & $100$ & $100\bm{I}$ & $100$ &  $2\sqrt{\bm{K}_1}$ & $20$ & $10\bm{I}$ & 
+            $5$
+        \end{tabular}
+    \end{center}
+\end{table}
+
+\subsection{Experiments}
+To further validate the method, experiments were conducted on a 7 DoF Franka Emika Panda robot manipulator, programmed using the Matlab/Simulink control interface, version 3.1. 
+% The interface gives access to the robot state, velocities, dynamic matrices and end-effector Jacobians. Everything is expressed either relative to the robots base frame, which is a "forward-left-up" right-handed coordinate frame placed at the robot base, or in the end-effector frame.
+% \todo[inline]{If we want to use some more space we could have a figure of the different frames}
+%* I think this part is unnecessary. 
+The tasks were chosen similarly to those in the simulations conducted in \cref{sec:simulation}, except with more tasks to fully utilize the 7 DoFs available on the manipulator. 
+
+\begin{figure}
+    \centering
+    \includegraphics[width=\linewidth]{figures/RAL/task_coordinates.pdf}
+    \caption{The robot manipulator in its initial configuration with task coordinates.}
+    \label{fig:task_coordinates}
+\end{figure}
+
+The highest priority task, $\bm{x}_1$ was the end-effector $x$- and $y$-positions in a frame equal to the base frame, but rotated $45^\circ$ about the $y$-axis. The secondary task, $x_2$, was the end-effector $z$-position, $\bm{x}_3$ was the end-effector orientation and the fourth and final task, $x_4$ was the angle of the first joint of the robot. The task coordinates are visualized along with the robot in its initial configuration in \cref{fig:task_coordinates}.
+The gains used for the controllers are given in \Cref{tab:gains}, while all \(\bm{K}_{P,i}\) from \eqref{eq:x_hat_dot} used for the previous passivation approach were set to \(3\bm{I}\) Hz. In order to allow precise regulation, while avoiding large system velocities during transients, each element of the proportional part of the task forces $\bm{F}_1$ and $\bm{F}_2$ from \eqref{eq:F_i} were saturated at $15$ N, while the elements of the proportional part of $\bm{F}_3$ and $\bm{F}_4$ were saturated at $10$ Nm.  
+%The parameter $\delta_\alpha$ from \eqref{eq:alpha_i} determining the smoothing layer between the two modes, energy in the tank and no energy in the tank, was set to $0.05$ J, the initial tank energy was set to $E_{t,0}=1.8$ J, and the lower limit of the energy tank $\underline{E}_{t}$ was set to $1$ J. The smoothing parameter $\delta_\alpha$ is chosen significantly larger than in the simulations to avoid violating any acceleration limits on the robot and unnecessary wear that a sudden change in commanded acceleration might cause. As in the simulations, $E_{t,0}$ and $\underline{E}_{t}$ were chosen such that both modes could be observed. 
+The parameter $\delta_\alpha$ from \eqref{eq:alpha_i} determining the smoothing layer between the two modes, energy in the tank and no energy in the tank, was set to $0.05$ J, which is significantly larger than in the simulations. This was done to avoid violating any acceleration limits on the robot and unnecessary wear that a sudden change in commanded acceleration might cause. The initial tank energy was set to $E_{t,0}=1.8$ J, and the lower energy tank limit to $\underline{E}_{t}=1$ J such that both modes could be observed.
+
+% ? Maybe remove the rest of this paragraph?
+Specifically, the task Jacobians are given by
+\begin{subequations}
+    \label{eq:exp_jacs}
+    \begin{alignat}{2}
+        \bm{J}_1 &= \begin{bmatrix}
+            1 & 0 & 0 \\ 0 & 1 & 0
+        \end{bmatrix}\bm{R}_{y, \frac{\pi}{4}} \bm{R}_{\mathrm{ee}} \bm{J}_\mathrm{body, pos}&& \in \mathbb{R}^{2\times 7}\\
+        \bm{J}_2 &= \begin{bmatrix}
+            0 & 0 & 1
+        \end{bmatrix}\bm{R}_\mathrm{ee} \bm{J}_\mathrm{body, pos}&& \in \mathbb{R}^{1\times 7}\\
+        \bm{J}_3 &= \bm{T}_\mathrm{ee} \bm{J}_\mathrm{body,att} && \in \mathbb{R}^{3\times 7}\\
+        \bm{J}_4 &= \begin{bmatrix}
+            1 & 0 & ... & 0
+        \end{bmatrix} &&\in \mathbb{R}^{1 \times 7},
+    \end{alignat}
+\end{subequations}
+where $\bm{R}_{y, \psi}$ is a rotation matrix rotating by $\psi$ degrees around the $y$-axis, $\bm{R}_\mathrm{ee}$ is the rotation matrix representation of the end-effector attitude relative to the base frame, $\bm{T}_\mathrm{ee}$ is the mapping from angular velocities to Euler angle derivatives, and $\bm{J}_\mathrm{body}$ is the body Jacobian from the Franka interface, which has been separated into its linear velocity part (first three rows), and angular velocity part (last three rows).
+\todo[inline]{I'm not sure if this is needed... Maybe remove the whole part on the task Jacobians?}
+
+\begin{figure}
+    \centering
+    % \includegraphics[width=\linewidth]{figures/RAL/Experiment/energy_exp_zoom.pdf}
+    \includegraphics[width=\linewidth]{figures/RAL/Experiment/energy_exp_small.pdf}
+    \caption{Value of the storage function \eqref{eq:storage_function} for the proposed approach, the previous passivation approach \cite{dietrichPassiveHierarchicalImpedance2017}, and the classical hierarchical impedance control scheme during the experiments.
+     Note that the energy of the classical method increases in the red shaded region, and that the energies of the proposed and previous method do not converge to 0 due to $\underline{E}_t = 1$ J.}
+    \label{fig:exp_energy}
+\end{figure}
+
+% \begin{figure}
+%     \centering
+%     \includegraphics[width=0.45\textwidth]{figures/RAL/Experiment/energy_exp_test.eps}
+%     \caption{Total energy in the system using the three different control schemes}
+%     \label{fig:exp_energy}
+% \end{figure}
+
+\begin{figure}
+    \centering
+    % \includegraphics[width=\linewidth]{figures/RAL/Experiment/x_subfigure.pdf}
+    \includegraphics[width=\linewidth]{figures/RAL/Experiment/x_subfigure_taller.pdf}
+    \caption{Errors of all the tasks using the three different methods during the experiments.}
+    \label{fig:exp_tasks}
+\end{figure}
+
+% Should we remove this part?
+The robot was initialized at rest in the configuration that satisfied all tasks, 
+with its joints at an initial angle of $\bm{q}_0 = \begin{bmatrix}
+ 0 & 0 & 0 & -\pi/2 & 0 & \pi/2 & \pi/4 \end{bmatrix}^T$, see \cref{fig:task_coordinates}.
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+Then, after two seconds, the setpoints of $\bm{x}_1$ and $x_2$ were moved in order to observe the transient behavior of the robot. The setpoints were moved relative to their initial values: $10$ cm backwards in the rotated $x$-direction for $\bm{x}_1$ and $5$ cm upwards in the $z$-direction for $x_2$. The setpoints of the remaining tasks were kept to their original values.
+% \begin{equation}
+%     \Delta \bm{x}_1 = [-0.1 \ 0]^T \quad \Delta \bm{x}_2 = 0.05
+%     \quad    \Delta \bm{x}_3 = [0 \ 0 \ 0]^T
+%     \quad \Delta \bm{x}_4 = 0
+% \end{equation}
+% ? Remove the equation? Or keep the equation but keep the in-text description a bit shorter?
+
+Due to the rotation of the highest priority task's $x$-axis, there is a clear coupling between that and the second task $x_2$, as the task coordinates are not orthogonal to each other. While the initial and final configuration are fully compatible, the coupling effect can be seen during the transient.
+
+In \cref{fig:exp_energy}, the total energy in the system using the three different control approaches is shown. The energies were computed after the joint velocities had been smoothened through a moving average method to remove noise from the measurements. These smoothened joint velocities were only used in the computation of the energies, not in the controller. Note that the classical approach has no energy tank and thus no initial energy, in contrast to the two passivity-based approaches. 
+Similarly, the total energy of the two passivity-based approaches converges to the minimum tank energy $\underline{E}_t$, while the energy of the classical method converges to $0$
+J. 
+After two seconds, there is an initial increase in the energy of all three methods when the task set points are changed. One can clearly see that the classical approach continues to increase the energy in the system due to the competing tasks, while in the two other approaches the energy only decreases, even after the energy tanks have been depleted. 
+% When the energy was calculated, the joint velocity measurements were smoothed through a moving average method to remove noise from the 
+% Note that the joint velocity measurements were smoothened through a moving average method to remove noise before the energies shown in \cref{fig:exp_energy} was computed. 
+
+
+
+%There are some oscillations present in the energy levels of both passivity-based methods, and a smooth, strictly decreasing energy level is not seen as the theory would suggest.
+%\todo[inline]{Explain why this is the case, (sudden increases in speed due to "slip-stick" effects? Why not in Classic)}
+
+Comparing the performance of the controllers in \cref{fig:exp_tasks}, the performance of the main task $\bm{x}_1$ is quite equivalent for all controllers. The proposed controller has a slightly longer transient than the others, but also yields a slightly lower steady-state error. 
+It should be noted that both the classical and proposed approaches theoretically should give zero steady-state error. However, as can be seen in the plots, perfect regulation is not achieved. This is due to unmodelled physical effects such as friction in the joints which cannot be compensated for by a proportional controller with no integral term. 
+% The steady-state error in all three controllers for the highest priority tasks are however quite miniscule compared to the lower priority tasks for the previous controller.
+% The secondary task, $x_2$, has a strong coupling effect from the highest priority task, which leads to an overshoot using the classic controller in the transient. Again, all methods converge within a centimeter of the target. 
+% Finally, in the two lowest-priority tasks, the performance of the previous passivation method is noticeably worse. Although all tasks are kinematically compatible, using the previous method, $\bm{x}_3$ converges to an average error of about $9$ degrees, while the two other methods converge almost perfectly.
+In the lower-prioritized tasks, however, the previous passivation approach yields noticeably worse performance than the two other methods do. This is especially noticeable in $\bm{x}_3$.
+Here, the previous passivation approach yields an average steady-state error of more than $4.5$ degrees even though the tasks are kinematically compatible, while the two other methods yield virtually no steady-state error.
+\section{Conclusions}\label{sec:conclusions}
+In this paper, we have proposed an energy tank scheme for output strictly passivating a strict hierarchical compliance controller, thus ensuring the $\mathcal{L}_2$ stability of the closed-loop system with respect to generalized external forces and joint velocities.
+In contrast to earlier passivation methods, the steady-state accuracy of the lower-priority tasks does not decrease further once the energy tank is empty.
+% as the passivity is maintained by allowing all tasks to have equal priority instead of further deteriorating the non-top-prioritized tasks' performance.  
+This is the result of the passivity being maintained by allowing all tasks to have the same priority once the energy tank is empty, instead of further deteriorating the performance of the lower-priority tasks.
+The proposed method has been proven to yield an output strictly passive system, and has been validated through both simulations and experiments. Furthermore, its merits have been showcased by comparing the results yielded by the proposed method to those yielded by a classical non-passive hierarchical impedance controller and a previously proposed passivation method. 
+Through these comparisons, it is clear that the proposed method achieves better overall steady-state results than the previous passivation method, at the expense of worse behavior in the transients, particularly for the originally higher-prioritized tasks.
+
+In future work, more complex sets of tasks for higher-dimensional systems such as humanoids or vehicle-manipulator systems could further verify the proposed method. Further comparison of the method with other passivity-based redundancy resolution schemes could also be interesting, for example comparing the proposed method to optimization-based methods. 
+
+%For applications where strict priority of the some tasks are critical, one could also look into combining our proposed approach with the approach from \cite{dietrichPassivationProjectionBasedNull2016}, choosing the appropriate method at each task hierarchy level.
+% \todo[inline]{Find some future work to do.}
+
+\ifSubfilesClassLoaded{%
+  \bibliographystyle{\chosenbibstyle}
+  \bibliography{\bibfilename}
+}{}
+
+
+\end{document}
+

@@ -1,6 +1,10 @@
 \documentclass[../main.tex]{subfiles}
-
 \begin{document}
+
+\chapter{Unifying the Generalized Jacobian Matrix and Dynamic Task-Priority}
+
+This chapter is based on \cite{wrzos-kaminska2024}.
+
 
 Free-floating vehicle manipulator systems (VMSs), such as those in space or underwater, experience a coupling effect between the motion of the manipulator arm and the vehicle base, since the motion of the joints induces a motion of the base relative to the system's center of gravity (CG).
 In this work a control framework is proposed that takes this coupling effect into account, selecting the motion of the CG as the highest priority task in a dynamically consistent task hierarchy in order to reduce the need for counteracting disturbances while controlling the position of the manipulator workspace. % for the purpose of repositioning the manipulator workspace.
@@ -91,7 +95,6 @@ The paper is organised as follows: the dynamic model of the \gls{vms} is present
 
 %\input{sections/appendix}
 
-\vspace{-7pt}
 \section{Vehicle model}\label{sec:model}\vspace{-7pt}
 We consider a \gls{uvms} with $n$ revolute joints, resulting in a total of $6+n$ \glspl{dof}. The pose of a frame fixed to the base of the vehicle is given by $\bm{\eta} = [\bm{p}^\top\ \bm{q}^\top]^\top \in \mathbb{R}^3 \times \mathbb{S}^3$, where $\bm{p}$ is the position of the origin of the base frame, and $\bm{q}$ is a quaternion representing its attitude relative to an inertial frame. The full configuration of the system is given by $\bm{\xi} = [\bm{\eta}^\top \ \bm{\theta}^{\top} ]^{\top} \in \mathbb{R}^3 \times \mathbb{S}^3 \times \mathbb{T}^n$, where $\bm{\theta}$ are the joint angles and $\mathbb{T}^n = \mathbb{S}^1 \times \mathbb{S}^1 \times ... \times \mathbb{S}^1$ is the $n$-torus. The system velocities are given by $\bm{\zeta} = [\bm{\nu}^\top\ \dot{\bm{\theta}}^\top]^\top \in \mathbb{R}^{6+n}$, which contains the body-fixed base velocities $\bm{\nu} \in \mathbb{R}^6$ and the joint velocities $\dot{\bm{\theta}}$.
 The equations of motion are~\citep{From2014,SchmidtDidlaukies2018}:
@@ -128,11 +131,9 @@ where $\bm{B}_{\textrm{thr}}(\bm{\theta}) \in \mathbb{R}^{6\times m}$.
 
 
 % In which we generalise the generalised Jacobian
-\vspace{-7pt}
 \section{Dynamically consistent task coordinates}\label{sec:taskcoordinates}\vspace{-8pt}
 In this section, we introduce the transformation to task coordinates presented by~\cite{Dietrich2020}, and show that the \gls{gjm} can be derived as the projected Jacobian of an end-effector pose task when the primary task belongs to a family of momentum-like tasks. Finally, we show that the desired structure of the coordinate transformation matrix is preserved for any choice of lower-priority tasks.
 
-\vspace{-8pt}
 \subsection{Task coordinate transformation}\label{ssec:hierarchy}\vspace{-9pt}
 A task hierarchy comprised of $q \in \mathbb{N}$ tasks is considered, where each task $i=1,...,q$ is defined in task-space coordinates as
 \begin{equation}
@@ -141,11 +142,13 @@ A task hierarchy comprised of $q \in \mathbb{N}$ tasks is considered, where each
 of dimension $m_i$. As in~\cite{Dietrich2020}, the choice of tasks is subject to the following assumptions:
 \begin{assumption}\label{ass:dof}
     The tasks are simultaneously feasible and the total dimension of the tasks is equal to the number  of \glspl{dof} of the system s.t. $\sum_{i=1}^{q} m_i = 6+n$.
-\end{assumption}\vspace{-5pt}
+\end{assumption}
+
 For each task, the objective is to follow a given desired trajectory $\bm{x}_{i,d}(t)$, which we gather into $\bm{x}_d(t) = [ \bm{x}_{1,d}(t)^\top, ..., \bm{x}_{q,d}(t)^\top ]^\top$.
 \begin{assumption}\label{ass:nonsingular}
     The desired trajectory $\bm{x}_d(t)$ avoids any singularities, and there exists an open neighborhood around the desired trajectory in the state space which is also free of singularities.
-\end{assumption}\vspace{-5pt}
+\end{assumption}
+
 Assumptions~\ref{ass:dof} and~\ref{ass:nonsingular} ensure that the augmented Jacobian for the full stack of tasks is invertible in a neighbourhood of the desired trajectory, which is necessary to realize the control input to be introduced later, and for the later stability analysis to be valid.
 %\todo[inline]{This probably excludes e.g. trajectories which require the end-effector to be at the boundary of the current workspace, which is not a huge problem for a \gls{vms} but further motivates our work on efficiently repositioning the workspace}
 %
@@ -213,7 +216,6 @@ By Assumptions~\ref{ass:dof} and~\ref{ass:nonsingular}, $\bm{J}^{\textrm{aug}}_q
     \bm{v}_i = \dot{\bm{x}}_i + \sum_{j=1}^{i-1} \bm{G}_{i,j} \dot{\bm{x}}_j
 \end{equation}
 
-\vspace{-9pt}
 \subsection{Relation with the \gls{gjm} and general structure with momentum as primary task}\label{sec:gjm_structure}\vspace{-10pt}
 In this section we derive the \gls{gjm} as a prioritized Jacobian for a particular choice of tasks, and we show that the beneficial structure of the task and actuator mappings obtained by~\cite{Giordano2018} can be preserved when performing tasks other than control of end-effector pose.
 
@@ -262,7 +264,7 @@ We can then find
 %\todo[inline]{They have new coordinate $\xi = \left[ A^{M+}\ Q^{M+} \right]\zeta$ with $A$ being an adjoint to a frame at CG and $Q=I_n$, and we arrive at $N_2^\top = \left[ 0 \ Q^{M+} \right]$. The prioritised Jacobians give "internal"/"relative" task velocities.}
 Consequently, $\bm{N}_2^\top$ can be interpreted as a projection into the space of what is called the internal motion of the system by~\cite{Giordano2018}.
 
-\vspace{-5pt}
+
 \subsubsection{Relation with the \gls{gjm}}
 Let there be a second task $\bm{x}_2 \in \mathbb{R}^{m_2}$ whose Jacobian can be split into two parts corresponding to the contributions from base velocity and joint velocities as in~\cite{Umetani1989}:
 \begin{equation}
@@ -278,7 +280,7 @@ with $\bm{J}_{2,b} \in \mathbb{R}^{m_2 \times 6}$, $\bm{J}_{2,m} \in \mathbb{R}^
 \end{equation}
 where $\bm{J}_{2,m} - \bm{J}_{2,b} \bm{M}_b^{-1} \bm{M}_{bm}^\top$ is the \gls{gjm}~\citep{Umetani1989}. As a consequence, if the second task is chosen to be the end-effector pose, the dynamically consistent task velocity $\bm{v}_2$ can be interpreted as the so-called internal end-effector velocity~\citep{Giordano2018}.
 
-\vspace{-5pt}
+
 \subsubsection{Triangular structure}
 Looking at the expression~\eqref{eq:Ni_nested} for the null-space projectors, it is apparent that every prioritized Jacobian~\eqref{eq:Ji_bar} of lower priority tasks, i.e. with $i \geq 2$, will be multiplied by $\bm{N}_2^\top$. If the primary task belongs to the group of "momentum-like" tasks whose velocity can be described by~\eqref{eq:generalised_v1}, the expression for $\bm{N}_2$ given by~\eqref{eq:N2_momentum} ensures that the Jacobians $\bar{\bm{J}}_i$ with $i \geq 2$ all start with six columns of zeros. As a result, $\bar{\bm{J}}$ has the following block-triangular structure:
 \begin{equation}\label{eq:Jbar_triang}
@@ -309,8 +311,8 @@ If the inverse mapping, i.e.~the mapping from desired inputs in dynamically cons
 
 %\todo[inline,color=yellow!20]{Use the "nested"/successive formulation of the null-space projections in~\citep{Wu2022} to show that the transform will still be block-triangular with momentum as primary task and any task hierarchy below}
 
-\vspace{-5pt}
-\section{Control law and control allocation}\label{sec:control}\vspace{-7pt}
+
+\section{Control law and control allocation}\label{sec:control}
 In this section we show how the results of Section~\ref{sec:gjm_structure} can be utilized to design a tracking control law and control allocation algorithm which use thrusters only for overall gross motion of the system to reposition its workspace, while the joints are used to perform additional tasks within the workspace.
 %Fra Kristin: that achieve accurate control of the position of and momentum about the~\gls{cg} using the thrusters only for the overall gross motion of the system, while using the joints to perform additional tasks. 
 We  base our tracking controller on our previous work~\citep{Saeboe2022}, with some required modifications, and we analyze the stability of the resulting closed-loop system. Moreover, we present a control allocation algorithm which ensures a triangular structure of the mapping from virtual task inputs to actuators.
@@ -339,7 +341,7 @@ where $m_{\textrm{tot}}$ is the total mass of the \gls{vms}. The references for 
 
 %\todo[inline]{Note that while~\cite{Giordano2019} control the attitude of the base, it is not controlled in the null-space of total momentum, but rather instead of rotational momentum. Since we consider a vehicle for which overall rotation is also actuated by thrusters (rather than more energy-efficient internal movable masses/reaction wheels), we want to control the (partial) attitude of the tail link without inducing rotational momentum, and instead exploiting additional manipulator DOFs.}
 
-\subsection{Tracking control law}\vspace{-8pt}
+\subsection{Tracking control law}
 For the tracking control, we will apply the tracking controller from our previous work, \cite{Saeboe2022}, with some modifications required to adapt it to our choice of primary task. %to deal with the case when one of the tasks is only to control momentum. 
 Let 
 \begin{equation}\label{eq:JBu}
@@ -401,7 +403,6 @@ where $\tilde{\bm{x}}_i = \bm{x}_i - \bm{x}_{i,d}(t)$ are the task tracking erro
 \end{align}
 The matrices $\bm{\Lambda}_i,\, \bm{K}_i,\, \bm{D}_i$ are control gain matrices and must be chosen positive definite.
 
-\vspace{-5pt}
 \subsubsection{Control input for the \gls{cg} and momentum task}
 For the primary task, we choose 
 \begin{equation}\label{eq:F1ctrl}
@@ -420,7 +421,7 @@ For the primary task, we choose
 \end{equation}
 where
 \begin{equation}\label{eq:p_cgr}
-    \dot{\bm{p}}_{\textrm{cg},r} = \dot{\bm{p}}_{\textrm{cg},d} - \bm{\Lambda}_{1,p} \tilde{\bm{p}}_{\textrm{cg}} \vspace{4pt}
+    \dot{\bm{p}}_{\textrm{cg},r} = \dot{\bm{p}}_{\textrm{cg},d} - \bm{\Lambda}_{1,p} \tilde{\bm{p}}_{\textrm{cg}}
 \end{equation}
 and $\bm{\Lambda}_{1,p},\, \bm{K}_{1,p},\, \bm{D}_{1,p},\, \bm{D}_{1,h}$ are positive definite gain matrices.
 The choice~\eqref{eq:F1ctrl} corresponds to~\eqref{eq:Fictrl} with $\bm{h}_{\textrm{rot},d} = 0$ s.t.~the last three elements of $\bm{s}_1$ are equal to $\bm{h}_{\textrm{rot}}$, and inserting $[\tilde{\bm{p}}_{\textrm{cg}}^\top,\, \bm{0}^\top]^\top$ in place of $\tilde{\bm{x}}_1$. When added mass effects are neglected in the mass matrix $\bm{M}$ as stated in Assumption~\ref{ass:added_mass}, the task inertia $\bar{\bm{M}}_1$ for this primary task becomes block-diagonal as in~\cite{Giordano2018}, and the upper left $3 \times 3$ block of $\bm{\mu}_{1,1}$ consists of zeros.
@@ -434,8 +435,8 @@ The choice~\eqref{eq:F1ctrl} corresponds to~\eqref{eq:Fictrl} with $\bm{h}_{\tex
     If the reference for the position of \gls{cg} is also chosen constant, and in the absence of external damping or hydrostatic forces, the control law given by~\eqref{eq:F},~\eqref{eq:Fictrl} for the momentum task reduces to the same one as in~\citep{Giordano2018} with total proportional gain $\bm{D}_{1,p} \bm{\Lambda}_{1,p} + \bm{K}_{1,p}$. If the lower-priority tasks are chosen to be only the regulation of end-effector pose as in the scenario considered by~\cite{Giordano2018}, the complete input~\eqref{eq:F},~\eqref{eq:Fictrl} for the end-effector task differs only by the cancellation of Coriolis terms through $\bm{F}^*_{\mu}$.%, which is not done by~\cite{Giordano2018}.
 \end{remark}
 %
-\vspace{-8pt}
-\subsection{Control allocation}\label{sec:alloc}\vspace{-8pt}
+
+\subsection{Control allocation}\label{sec:alloc}
 To ensure that thrusters are used for gross motion of the workspace, while joints are used for more precise motion within the current workspace, the control allocation must be designed to preserve the desired triangular structure when inverting the mapping~\eqref{eq:F} in order to map the virtual inputs $\bm{F}$ to actuator inputs $\bm{u}$. %As stated in Section~\ref{sec:gjm_structure}, if the input configuration matrix $\bm{B}(\bm{\theta})$ is block-diagonal, this follows from the block-triangular structure of $\bar{\bm{J}}$. However, for an \gls{aiauv}, 
 When the matrix $\bm{B}(\bm{\theta})$ given by~\eqref{eq:B} is lower block-triangular, and when $\bar{\bm{J}}$ has the form~\eqref{eq:Jbar_triang}, the product $\bar{\bm{J}}^{-\top}(\bm{\xi}) \bm{B} (\bm{\theta} )$ is likewise lower block triangular. As a consequence, joint torques have no impact on the primary task as intended. In order to also ensure that thrusters are engaged only to realize the input to the primary task, the inverse of the mapping $\bar{\bm{J}}^{-\top}(\bm{\xi}) \bm{B} (\bm{\theta} )$ must also be lower block-triangular. However, the pseudoinverse of a block-triangular matrix is not necessarily block-triangular~\citep{Meyer1970}.
 
@@ -483,7 +484,6 @@ Using this and inserting~\eqref{eq:F} for $\bm{F}$ into~\eqref{eq:alloc}, we can
 %\todo[inline]{This argument is going to be a bit hairy (at least to write up formally). The velocities of the UVMS can be expressed in the task velocities, and are therefore bounded for bounded references when all tasks are complete (aka in the set $\mathcal{A}_q$). The state of the UVMS is uniquely specified by its joint angles, the position of one reference point, and the orientation of one reference frame. The position of the base (i.e. state in original coordinates) is uniquely given by the position of CG, a reference orientation and joints. The orientation and joint angles are not necessarily uniquely defined when all tasks are complete, but can be represented as evolving on compact manifolds. Thus we can argue that $\mathcal{A}_q$ is a compact set.}
 %
 Since there is no task error associated with the task velocity $\bm{h}_{\textrm{rot}}$, the completion of all tasks does not uniquely specify the system state. Let  $\bm{s}_1 = \bigl[\left( \dot{\bm{p}}_{\textrm{cg}} - \dot{\bm{p}}_{\textrm{cg},r} \right)^\top, \bm{h}_{\textrm{rot}}^\top \bigr]^\top$ and $\bm{s} = \left[\bm{s}_1^\top, ..., \bm{s}_q^\top \right]^\top$. Let the full state of the system be described by $\bm{z} = [ \tilde{\bm{p}}_{\textrm{cg}}^\top, \bm{q}^\top, \bm{\theta}^\top, \bm{s}^\top ]^\top$, and let the complete state space be denoted $\mathcal{A}_0$. Similarly to~\cite{Dietrich2020}, we define successive nested sets in which consecutive tasks are completed, the first of which we define as
-\vspace{-3pt}
 \begin{equation}
     \mathcal{A}_1 = \left\{ \bm{z} \, | \, \tilde{\bm{p}}_{\textrm{cg}} = 0,\, \dot{\tilde{\bm{p}}}_{\textrm{cg}} = 0,\, \bm{h}_{\textrm{rot}} = 0 \right\}
 \end{equation}
@@ -719,6 +719,10 @@ which gives
 %Reasoning along the same lines as~\cite{Garofalo2015}, consider the equation~\eqref{eq:v_dyn} in the abscence of any external or input forces, i.e.~without hydrodynamic damping or hydrostatic forces. The topmost rows describing the dynamics of $\bm{v}_1$
 
 %Since we have neglected added mass effects so that $\bm{M}$ is the rigid-body mass of the \gls{vms}, we then
+\ifSubfilesClassLoaded{%
+  \bibliographystyle{\chosenbibstyle}
+  \bibliography{\bibfilename}
+}{}
 
 
 \end{document}
